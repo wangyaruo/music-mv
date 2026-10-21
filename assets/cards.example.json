@@ -1,0 +1,55 @@
+{
+ "opening": [
+  {
+   "start": 0.85,
+   "end": 7.05,
+   "text": "园游会",
+   "place": "M",
+   "title": true,
+   "y": 505,
+   "fs": 208,
+   "bord": 6.4
+  },
+  {
+   "start": 1.75,
+   "end": 7.05,
+   "text": "周杰伦",
+   "place": "M",
+   "title": true,
+   "y": 678,
+   "fs": 78,
+   "sp": 24,
+   "bord": 4.4
+  },
+  {
+   "start": 2.5,
+   "end": 7.05,
+   "text": "词 方文山　　曲 周杰伦",
+   "block": true,
+   "place": "M",
+   "y": 786,
+   "fs": 34,
+   "sp": 6,
+   "bord": 3.4,
+   "fade": 600
+  }
+ ],
+ "ending": [
+  {
+   "start": 248.8,
+   "end": 251.9,
+   "text": "园游会",
+   "place": "M",
+   "title": true,
+   "y": 236
+  },
+  {
+   "start": 251.9,
+   "end": 255.0,
+   "text": "周杰伦",
+   "place": "M",
+   "title": true,
+   "y": 372
+  }
+ ]
+}
