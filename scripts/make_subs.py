@@ -43,6 +43,8 @@ OUTLINE, SHADOW = 3.6, 2.4                  # 描边 / 投影
 BORDER = 1                                  # 1=描边 3=不透明底框
 CHUNK_MAX = 18                              # 每段最多几个字（整句一行）
 MIN_STEP = 0.15                             # 每字最短间隔，防密集句过快
+REVEAL = 0.78                              # 出字只用句长的前 78%，末字留住在长音上
+                                           # （铺满整句会让句尾越拖越慢，听起来字幕滞后）
 TILT = [-2.2, 1.6, -1.1, 2.6, -1.8, 0.9, -0.6, 2.1, -2.8, 1.3, -1.4, 2.3]
 
 # 主题预设：cut = 描边字（推荐，最不挡画面）；box = 色块底框（复古 MV 感）
@@ -175,8 +177,12 @@ def emit(out, item, grid, idx):
                       item["text"].strip()))
         return
 
-    times = [start] * len(text) if title else grid.plan(start, end, len(text))
-    hold = 0.0 if title else 0.30
+    # 出字窗口只占句长的前 REVEAL，末字落到长音上而不是一直拖到句尾
+    plan_end = start + (end - start) * REVEAL
+    times = [start] * len(text) if title else grid.plan(start, plan_end, len(text))
+    # 末字已经在 REVEAL 之后的 22% 里停住了，句尾无需再留；
+    # 留太多会和下一句重叠，看起来就是"字幕和画面没对上"
+    hold = 0.0 if title else 0.06
 
     n = len(text)
     if title or n <= CHUNK_MAX:

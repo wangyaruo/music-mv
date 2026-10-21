@@ -39,6 +39,9 @@ def main():
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--fade", type=float, default=0.5)
     ap.add_argument("--no-snap", action="store_true", help="不吸附拍点")
+    ap.add_argument("--grid-div", type=float, default=1.0,
+                    help="吸附网格 = 拍 / grid_div。1=整拍；4=1/4拍，与歌词网格一致，"
+                         "切点才能和歌词起点重合（默认 4）")
     ap.add_argument("--fadeblack", default="", help="需要黑场过渡的转场序号，如 5,8")
     ap.add_argument("--out", default="filter_base.txt")
     a = ap.parse_args()
@@ -51,6 +54,7 @@ def main():
         bounds = raw
     else:
         per, off = load_beats(a.beats)
+        per = per / a.grid_div
         bounds = [raw[0]] + [round(off + round((b - off) / per) * per, 3)
                              for b in raw[1:-1]] + [raw[-1]]
         moved = [round(n - o, 3) for n, o in zip(bounds, raw)]

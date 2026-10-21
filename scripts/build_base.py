@@ -68,6 +68,9 @@ def main():
     ap.add_argument("--beats", required=True)
     ap.add_argument("--total", type=float, required=True, help="成片总时长（=音频时长）")
     ap.add_argument("--fade", type=float, default=0.45)
+    ap.add_argument("--grid-div", type=float, default=4.0,
+                    help="切点吸附网格 = 拍 / N。默认 4（1/4 拍），与歌词起点同一网格；"
+                         "设 1 则吸整拍，但会和歌词起点错开最多 ±0.25s")
     ap.add_argument("--fill-ids", default="", help="尾奏填充镜头 id，逗号分隔")
     ap.add_argument("--max-fill", type=float, default=6.0,
                     help="单个填充镜头的时长上限，应 ≤ 素材时长，否则会慢放")
@@ -136,6 +139,7 @@ def main():
            "--total", "%.3f" % a.total,
            "--clip-lens", ",".join("%.3f" % x for x in lens),
            "--fade", "%.3f" % a.fade,
+           "--grid-div", "%.1f" % a.grid_div,
            "--fps", str(a.fps),
            "--out", filt]
     r = subprocess.run(cmd, capture_output=True, text=True)

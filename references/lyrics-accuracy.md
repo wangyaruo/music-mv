@@ -116,3 +116,62 @@ ffmpeg -ss 20 -i input.mp4 -frames:v 1 frame.png
 - [ ] 「的/地/得」按自己的习惯写，不是原词
 - [ ] 全角/半角标点混用
 - [ ] 句中的空格位置影响字幕分块，改歌词后要重新跑字幕脚本
+
+## 用原片自带歌词做时间轴校准（最硬的证据）
+
+如果用户给的是带滚动歌词的视频（KTV 版、歌词版 MV），那就是**免费的标准答案**。
+
+### 取歌词区
+
+```bash
+# 原片 720x1280，歌词面板在下半部
+ffmpeg -ss 31 -t 175 -i source.mp4 -vf "fps=2,crop=720:460:0:780" /tmp/lf/f_%04d.png
+```
+
+### OCR 读当前行
+
+macOS 自带 Vision 框架，用 Swift 调，中文识别准确率够用：
+
+```swift
+// ocr.swift —— swiftc -O ocr.swift -o ocr
+import Foundation
+import Vision
+import AppKit
+
+for path in CommandLine.arguments.dropFirst() {
+    guard let img = NSImage(contentsOfFile: path),
+          let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
+    let req = VNRecognizeTextRequest()
+    req.recognitionLanguages = ["zh-Hans"]
+    req.recognitionLevel = .accurate
+    req.usesLanguageCorrection = false          // 歌词不要纠错
+    try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([req])
+    var items: [(CGFloat, String)] = []
+    for obs in (req.results ?? []) {
+        guard let c = obs.topCandidates(1).first else { continue }
+        items.append((obs.boundingBox.midY, c.string))
+    }
+    items.sort { $0.0 > $1.0 }                   // 从上到下
+    print("\(path)\t" + items.map { "\($0.0):\($0.1)" }.joined(separator: " ; "))
+}
+```
+
+### 判读
+
+歌词块是**提词器式滚动**：当前行固定在画面某一行的位置，整块逐步上移。
+
+- 先丢掉顶部的「情书（音乐馆）」标题行
+- 观察某一行的文本何时被新文本替换 → 那就是换行时刻
+- 把两遍的换行时刻对齐，**同一句的差值必须是常数**
+
+本案例实测：第一遍 44.5 / 48.0 / 52.0 / 56.0 / 60.0 / 63.5，
+第二遍 139.0 / 143.0 / 146.5 / 150.5 / 154.5 / 158.0，差值恒为 94.5s。
+而按字数比例分配出来的第二遍逐句滞后 1.2 → 2.8s，就是用户听到的"从 2:26 开始全乱"。
+
+### 两个坑
+
+- **不要试图找"高亮"**。这类视频的歌词是统一色，看着像有高亮往往是 JPEG 色偏
+  或拼图色偏造成的错觉
+- **不要用逐帧互相关追踪滚动量**。背景画面在动，会大量漏检和误检，
+  聚类出来的"事件"一半是假的。用 OCR 读文本最稳
+

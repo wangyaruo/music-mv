@@ -79,9 +79,10 @@ python scripts/mix_final.py --base out/base.mp4 --audio song.mp3 --subs out/subs
 ## 文档
 
 - [SKILL.md](SKILL.md) —— 完整工作流与每个环节的判断依据
-- [references/pipeline.md](references/pipeline.md) —— 数据结构、时间线数学、成本模型
-- [references/lyrics-accuracy.md](references/lyrics-accuracy.md) —— 歌词校对流程（最容易翻车的一步）
-- [references/subtitle-styling.md](references/subtitle-styling.md) —— ASS 版式与踩坑
+- [references/pipeline.md](references/pipeline.md) —— 数据结构、时间线数学、成本模型、真实案例复盘
+- [references/visual-style.md](references/visual-style.md) —— 画风锁定：从设计稿到 40 镜不跑偏
+- [references/lyrics-accuracy.md](references/lyrics-accuracy.md) —— 歌词校对，以及用 OCR 读原片歌词做时间轴校准
+- [references/subtitle-styling.md](references/subtitle-styling.md) —— ASS 版式、逐字节奏（`REVEAL`）、踩坑
 - [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md) —— 滤镜配方
 - [references/troubleshooting.md](references/troubleshooting.md) —— 现象 / 原因 / 处理
 
