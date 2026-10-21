@@ -259,8 +259,13 @@ python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
 ```bash
 python scripts/build_lines.py --timing out/lines_timing.json --shots out/shots.tsv \
     --cards out/cards.json -o out/lines.json
-python scripts/make_subs.py --lines out/lines.json --beats out/beats.json -o out/subs.ass
+python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
+    --motifs -o out/subs.ass
 ```
+
+`--motifs` 会按歌词意象在句子左侧挂矢量小图案（气泡/爱心/气球/太阳/票根…），
+不需要图片素材。细节与扩展方法见
+[references/subtitle-styling.md](references/subtitle-styling.md) 的"装饰层"一节。
 
 `build_lines.py` 的职责是**把字幕位置绑到镜头上**：每句歌词按中点落在哪个镜头，
 就继承那个镜头的 `place`。这是"字幕跟画面联动、不是固定一行"的实现方式。

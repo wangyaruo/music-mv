@@ -32,8 +32,16 @@ lines.json（每句一条）:
 import argparse
 import json
 import os
+import sys
 
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from motifs import detect as motif_detect, build as motif_build   # noqa: E402
+
+# 装饰层（气泡/爱心/气球/太阳…）是否启用，由 --motifs 打开
+MOTIFS_ON = False
+MOTIF_SIZE = 100
 
 # ---- 版式（日系动画字幕：无底框、暖白字 + 深褐描边 + 投影）----
 FS, PAD, GAP, ROW_Y = 88, 0, 10, 986       # 正文：字号 / 留白(无框=0) / 字间缝 / 底部行中心
@@ -69,6 +77,52 @@ def bgr_a(rgb, alpha=0x00):
 
 def ts(t):
     return "%d:%02d:%05.2f" % (int(t // 3600), int(t % 3600 // 60), t % 60)
+
+
+def _emit_motifs(out, text, start, end, y, total, x0, fs, idx=0):
+    """在文字行两端挂小图案（气泡/爱心/气球/太阳…）。
+
+    整句只挂一次。放不下时挪到文字上方居中，绝不上到文字行里。
+    """
+    names = motif_detect(text)
+    if not names:
+        return
+    size = MOTIF_SIZE
+    t_on = start + 0.12
+    t_end = max(end, t_on + 0.6)
+
+    left_edge = x0 - fs / 2
+    right_edge = left_edge + total
+
+    # 统一贴在文字左侧，像句首的标记点：
+    # 放右侧会飘到画框边缘，和场景里的灯笼/云混在一起就认不出来了
+    GAP = 34
+    slots = []
+    lx = left_edge - GAP - size
+    if lx >= 18:
+        slots.append((lx, y - size / 2))
+    else:                              # 两侧都没余量：贴到文字上方/下方
+        sx = max(24, left_edge - GAP - size * 0.6)
+        if y < 300:
+            slots.append((sx, y + fs * 0.62 + 8))
+        else:
+            slots.append((sx, y - fs * 0.62 - size - 8))
+
+    edge = bgr(PALETTE[0][2])
+    for k, name in enumerate(names):
+        path, floaty, color = motif_build(name, size)
+        sx, sy = slots[k % len(slots)]
+        tilt = 0 if floaty else (-6 if (idx + k) % 2 == 0 else 6)
+        if floaty:
+            pos = ("\\an7\\move(%.1f,%.1f,%.1f,%.1f,0,%d)"
+                   % (sx, sy, sx, sy - 34, int((t_end - t_on) * 1000)))
+        else:
+            pos = "\\an7\\pos(%.1f,%.1f)" % (sx, sy)
+        tags = ("{%s\\p1\\frz%d\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)"
+                "\\t(150,230,\\fscx100\\fscy100)\\fad(110,240)"
+                "\\1c%s\\3c%s\\bord3.2\\shad1.2\\b1}" % (pos, tilt, bgr(color), edge))
+        out.append("Dialogue: 0,%s,%s,Tile,,0,0,0,,%s%s"
+                   % (ts(t_on), ts(t_end), tags, path))
 
 
 def head(font):
@@ -225,11 +279,15 @@ def emit(out, item, grid, idx):
             out.append("Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s"
                        % (ts(t_on), ts(t_end),
                           "BigTile" if title else "Tile", head_txt, ch))
+
+        # 装饰层：整句只挂一次，不逐字重复
+        if MOTIFS_ON and not title and ci == 0:
+            _emit_motifs(out, item["text"], start, end, y, total, x0, fs, idx)
         i += m
 
 
 def main():
-    global FS, PAD, TFS, OUTLINE, SHADOW, BORDER
+    global FS, PAD, TFS, OUTLINE, SHADOW, BORDER, MOTIFS_ON, MOTIF_SIZE
     ap = argparse.ArgumentParser()
     ap.add_argument("--lines", required=True)
     ap.add_argument("--beats", default="")
@@ -237,6 +295,9 @@ def main():
     ap.add_argument("--font", default="ZCOOL KuaiLe")
     ap.add_argument("--theme", default="cut", choices=sorted(THEMES),
                     help="cut=描边字（默认） box=色块底框")
+    ap.add_argument("--motifs", action="store_true",
+                    help="按歌词意象在句子两端加小图案（气泡/爱心/气球/太阳等）")
+    ap.add_argument("--motif-size", type=int, default=100)
     ap.add_argument("--fontsdir", default="",
                     help="打印可直接粘贴的 ass 滤镜串时用的字体目录")
     a = ap.parse_args()
@@ -244,6 +305,8 @@ def main():
     t = THEMES[a.theme]
     BORDER, PAD, OUTLINE, SHADOW = t["border"], t["pad"], t["outline"], t["shadow"]
     FS, TFS = t["fs"], t["tfs"]
+    MOTIFS_ON = a.motifs
+    MOTIF_SIZE = a.motif_size
 
     with open(a.lines, encoding="utf-8") as f:
         items = json.load(f)
