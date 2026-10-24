@@ -42,6 +42,8 @@ from motifs import detect as motif_detect, build as motif_build   # noqa: E402
 # 装饰层（气泡/爱心/气球/太阳…）是否启用，由 --motifs 打开
 MOTIFS_ON = False
 MOTIF_SIZE = 100
+FRAME_W, FRAME_H = 1920, 1080
+LAYOUT_SCALE = 1.0
 
 # ---- 版式（日系动画字幕：无底框、暖白字 + 深褐描边 + 投影）----
 FS, PAD, GAP, ROW_Y = 88, 0, 10, 986       # 正文：字号 / 留白(无框=0) / 字间缝 / 底部行中心
@@ -96,14 +98,14 @@ def _emit_motifs(out, text, start, end, y, total, x0, fs, idx=0):
 
     # 统一贴在文字左侧，像句首的标记点：
     # 放右侧会飘到画框边缘，和场景里的灯笼/云混在一起就认不出来了
-    GAP = 34
+    GAP = 34 * LAYOUT_SCALE
     slots = []
     lx = left_edge - GAP - size
-    if lx >= 18:
+    if lx >= 18 * LAYOUT_SCALE:
         slots.append((lx, y - size / 2))
     else:                              # 两侧都没余量：贴到文字上方/下方
-        sx = max(24, left_edge - GAP - size * 0.6)
-        if y < 300:
+        sx = max(24 * LAYOUT_SCALE, left_edge - GAP - size * 0.6)
+        if y < FRAME_H * 300 / 1080:
             slots.append((sx, y + fs * 0.62 + 8))
         else:
             slots.append((sx, y - fs * 0.62 - size - 8))
@@ -115,7 +117,7 @@ def _emit_motifs(out, text, start, end, y, total, x0, fs, idx=0):
         tilt = 0 if floaty else (-6 if (idx + k) % 2 == 0 else 6)
         if floaty:
             pos = ("\\an7\\move(%.1f,%.1f,%.1f,%.1f,0,%d)"
-                   % (sx, sy, sx, sy - 34, int((t_end - t_on) * 1000)))
+                   % (sx, sy, sx, sy - 34 * LAYOUT_SCALE, int((t_end - t_on) * 1000)))
         else:
             pos = "\\an7\\pos(%.1f,%.1f)" % (sx, sy)
         tags = ("{%s\\p1\\frz%d\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)"
@@ -129,19 +131,21 @@ def head(font):
     fill, ink, edge = PALETTE[0]
     return """[Script Info]
 ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
+PlayResX: {width}
+PlayResY: {height}
 WrapStyle: 2
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Tile,{font},{fs},{ink},{ink},{edge},{fill},-1,0,0,0,100,100,2.4,0,{border},{ol},{sh},5,0,0,0,1
-Style: BigTile,{font},{tfs},{tink},{tink},{tedge},{tfill},-1,0,0,0,100,100,4.0,0,{border},{tol},{tsh},5,0,0,0,1
+Style: Tile,{font},{fs},{ink},{ink},{edge},{fill},-1,0,0,0,100,100,{sp},0,{border},{ol},{sh},5,0,0,0,1
+Style: BigTile,{font},{tfs},{tink},{tink},{tedge},{tfill},-1,0,0,0,100,100,{tsp},0,{border},{tol},{tsh},5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """.format(font=font, fs=FS, tfs=TFS, border=BORDER,
+           width=FRAME_W, height=FRAME_H,
+           sp=2.4 * LAYOUT_SCALE, tsp=4.0 * LAYOUT_SCALE,
            ink=bgr_a(ink), edge=bgr_a(edge), fill=bgr_a(fill),
            ol=OUTLINE, sh=SHADOW, tol=OUTLINE * 1.3, tsh=SHADOW * 1.2,
            tink=bgr_a(PALETTE[12][1]), tedge=bgr_a(PALETTE[12][2]), tfill=bgr_a(PALETTE[12][0]))
@@ -224,9 +228,9 @@ def emit(out, item, grid, idx):
     if item.get("block"):
         fd = int(item.get("fade", 600))
         out.append("Dialogue: 0,%s,%s,Tile,,0,0,0,,"
-                   "{\\an5\\pos(960,%.1f)\\fs%d\\fsp%.1f\\bord%.2f"
+                   "{\\an5\\pos(%.1f,%.1f)\\fs%d\\fsp%.1f\\bord%.2f"
                    "\\fad(%d,%d)\\1c%s\\3c%s\\fscx100\\fscy100}%s"
-                   % (ts(start), ts(end), y, int(fs), sp, bord,
+                   % (ts(start), ts(end), FRAME_W / 2, y, int(fs), sp, bord,
                       fd, fd, bgr(PALETTE[idx][1]), bgr(PALETTE[idx][2]),
                       item["text"].strip()))
         return
@@ -250,11 +254,24 @@ def emit(out, item, grid, idx):
             chunks.append(text[pos:pos + size])
             pos += size
 
+    # 任何画幅都不能让整句或长标题出框；按最长 chunk 一次性收缩，
+    # 避免在多 chunk 循环里反复缩放。
+    max_m = max(len(c) for c in chunks)
+    max_total = max_m * tile + (max_m - 1) * gap
+    usable = FRAME_W * 0.92
+    if max_total > usable:
+        factor = usable / max_total
+        fs *= factor
+        gap *= factor
+        sp *= factor
+        bord *= max(0.65, factor)
+        tile = fs + 2 * pad
+
     i = 0
     for ci, chunk in enumerate(chunks):
         m = len(chunk)
         total = m * tile + (m - 1) * gap
-        x0 = (1920 - total) / 2 + tile / 2
+        x0 = (FRAME_W - total) / 2 + tile / 2
         if i + m < n:
             seg_end = times[i + m] + 0.10
         else:
@@ -288,6 +305,8 @@ def emit(out, item, grid, idx):
 
 def main():
     global FS, PAD, TFS, OUTLINE, SHADOW, BORDER, MOTIFS_ON, MOTIF_SIZE
+    global GAP, TPAD, TGAP, ROW_Y, TOP_Y, MID_Y, TROW_Y
+    global FRAME_W, FRAME_H, LAYOUT_SCALE
     ap = argparse.ArgumentParser()
     ap.add_argument("--lines", required=True)
     ap.add_argument("--beats", default="")
@@ -298,43 +317,65 @@ def main():
     ap.add_argument("--motifs", action="store_true",
                     help="按歌词意象在句子两端加小图案（气泡/爱心/气球/太阳等）")
     ap.add_argument("--motif-size", type=int, default=100)
+    ap.add_argument("--width", type=int, default=1920, help="画布宽，默认 1920")
+    ap.add_argument("--height", type=int, default=1080, help="画布高，默认 1080；竖屏用 1080x1920")
     ap.add_argument("--fontsdir", default="",
                     help="打印可直接粘贴的 ass 滤镜串时用的字体目录")
     a = ap.parse_args()
 
+    if a.width <= 0 or a.height <= 0:
+        raise SystemExit("--width 与 --height 必须大于 0")
     t = THEMES[a.theme]
-    BORDER, PAD, OUTLINE, SHADOW = t["border"], t["pad"], t["outline"], t["shadow"]
-    FS, TFS = t["fs"], t["tfs"]
+    FRAME_W, FRAME_H = a.width, a.height
+    # 以 1920x1080 为设计基准等比换算；竖屏取较小比例，避免长句超宽。
+    LAYOUT_SCALE = min(a.width / 1920.0, a.height / 1080.0)
+    BORDER = t["border"]
+    PAD, OUTLINE, SHADOW = (t["pad"] * LAYOUT_SCALE,
+                            t["outline"] * LAYOUT_SCALE,
+                            t["shadow"] * LAYOUT_SCALE)
+    FS, TFS = t["fs"] * LAYOUT_SCALE, t["tfs"] * LAYOUT_SCALE
+    GAP, TGAP = 10 * LAYOUT_SCALE, 14 * LAYOUT_SCALE
+    TPAD = 0
+    ROW_Y, TROW_Y = FRAME_H * 986 / 1080, FRAME_H * 860 / 1080
+    TOP_Y, MID_Y = FRAME_H * 118 / 1080, FRAME_H * 486 / 1080
     MOTIFS_ON = a.motifs
-    MOTIF_SIZE = a.motif_size
+    MOTIF_SIZE = a.motif_size * LAYOUT_SCALE
 
     with open(a.lines, encoding="utf-8") as f:
         items = json.load(f)
     grid = BeatGrid(a.beats)
 
     lines = [head(a.font)]
-    allt = []
+    first_offsets, last_ratios = [], []
     for idx, it in enumerate(items):
         emit(lines, it, grid, idx % len(PALETTE))
         txt = "".join(c for c in it["text"] if c.strip())
-        if not it.get("title") and not it.get("block"):
-            allt += grid.plan(float(it["start"]), float(it["end"]), len(txt))
+        if not it.get("title") and not it.get("block") and txt:
+            start, end = float(it["start"]), float(it["end"])
+            if end > start:
+                # 与 emit 使用同一个 REVEAL 窗口，验收真实出字计划而非另一套时刻。
+                times = grid.plan(start, start + (end - start) * REVEAL, len(txt))
+                first_offsets.append(times[0] - start)
+                last_ratios.append((times[-1] - start) / (end - start))
 
     with open(a.out, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
-    print("written:", a.out, "events:", len(lines) - 1, " theme:", a.theme)
-    if grid.ok:
-        errs = [abs(t - grid.snap(t)) for t in allt]
-        print("网格 %.4fs 偏移 %.3fs 最大偏离 %.4fs"
-              % (grid.base, grid.off, max(errs) if errs else 0))
+    events = sum(1 for line in lines if line.startswith("Dialogue:"))
+    print("written:", a.out, "events:", events, " theme:", a.theme,
+          " canvas: %dx%d" % (FRAME_W, FRAME_H))
+    if first_offsets:
+        print("首字相对句起点: 最早 %+.3fs  最晚 %+.3fs"
+              % (min(first_offsets), max(first_offsets)))
+        print("末字落点/句长: %.3f–%.3f（REVEAL 目标 %.2f）"
+              % (min(last_ratios), max(last_ratios), REVEAL))
 
     # 直接给出可粘贴的滤镜串——fontsdir 必须是绝对路径，否则 ffmpeg 静默失败
     fd = a.fontsdir or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                     "..", "assets", "fonts")
     fd = os.path.abspath(fd)
     print("\n叠加到视频时用：")
-    print("  ass=%s:fontsdir='%s'" % (os.path.abspath(a.out), fd))
+    print("  ass=filename='%s':fontsdir='%s'" % (os.path.abspath(a.out), fd))
 
 
 if __name__ == "__main__":

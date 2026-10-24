@@ -125,6 +125,11 @@ xfade 起始 offset[i] = 累计时长 - D/2
 `offset = 切点 − D/2` 是核心：叠化跨越切点前后各 `D/2`，
 中点在切点上，视觉"切"的瞬间正好压住拍子。
 
+**输出时长补偿**：这条链的自然输出比 `total` 短 `D/2`（末段没有额外的 D）。
+当前 `make_timeline.py` 会在链尾加 `tpad=stop_mode=clone` 再
+`trim=duration=<total>`，并用 `build_report.json` 记录实测时长；
+不要再靠混音时手填一个略小的 `--duration` 来补偿。
+
 ## 成本模型
 
 以全曲逐句为例（本 skill 的基准案例）：

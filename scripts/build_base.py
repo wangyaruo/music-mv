@@ -66,8 +66,12 @@ def main():
     ap.add_argument("--clips-dir", default="clips")
     ap.add_argument("--clip-pattern", default="v{stem}.mp4")
     ap.add_argument("--beats", required=True)
-    ap.add_argument("--total", type=float, required=True, help="成片总时长（=音频时长）")
+    ap.add_argument("--total", type=float, default=0.0,
+                    help="成片总时长（=音频时长）；0 表示用 --audio 自动探测")
+    ap.add_argument("--audio", default="", help="音频路径；--total 为 0 时用于自动探测时长")
     ap.add_argument("--fade", type=float, default=0.45)
+    ap.add_argument("--max-slow", type=float, default=1.3,
+                    help="允许的最大慢放倍数，默认 1.3；0 表示不限制")
     ap.add_argument("--grid-div", type=float, default=4.0,
                     help="切点吸附网格 = 拍 / N。默认 4（1/4 拍），与歌词起点同一网格；"
                          "设 1 则吸整拍，但会和歌词起点错开最多 ±0.25s")
@@ -77,6 +81,9 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="只生成滤镜脚本，不渲染")
     ap.add_argument("--fps", type=int, default=24)
+    ap.add_argument("--width", type=int, default=0,
+                    help="输出宽；与 --height 一起用时自动等比缩放并补边")
+    ap.add_argument("--height", type=int, default=0, help="输出高；与 --width 一起用")
     ap.add_argument("--crf", type=int, default=16)
     ap.add_argument("--preset", default="medium")
     ap.add_argument("--ffmpeg", default="")
@@ -86,6 +93,14 @@ def main():
 
     ff = a.ffmpeg or ffmpeg_exe()
     os.makedirs(a.work_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
+    if bool(a.width) != bool(a.height):
+        raise SystemExit("--width 与 --height 必须同时提供")
+    if a.total <= 0:
+        if not a.audio:
+            raise SystemExit("请提供 --total，或用 --audio 让脚本自动读取音频时长")
+        a.total = probe_duration(a.audio, ff)
+        print("音频时长自动探测: %.3fs" % a.total)
 
     shots = load_shots(a.shots)
     bounds = [s[1] for s in shots] + [shots[-1][2]]
@@ -128,8 +143,8 @@ def main():
     n_short = sum(1 for i, L in enumerate(lens)
                   if L < (bounds[i + 1] - bounds[i]) + a.fade)
     if n_short:
-        print("⚠ 有 %d 段素材短于「镜头时长+叠化」，会在尾部冻结补帧（通常落在叠化区，不可见）"
-              % n_short)
+        print("⚠ 有 %d 段素材短于「镜头时长+叠化」，将自动慢放补齐；"
+              "超过 --max-slow 会中止，需拆镜或更换素材" % n_short)
 
     filt = os.path.join(a.work_dir, "filter_base.txt")
     cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -140,7 +155,10 @@ def main():
            "--clip-lens", ",".join("%.3f" % x for x in lens),
            "--fade", "%.3f" % a.fade,
            "--grid-div", "%.1f" % a.grid_div,
+           "--max-slow", "%.3f" % a.max_slow,
            "--fps", str(a.fps),
+           "--width", str(a.width), "--height", str(a.height),
+           "--report", os.path.join(a.work_dir, "timeline_report.json"),
            "--out", filt]
     r = subprocess.run(cmd, capture_output=True, text=True)
     print(r.stdout.strip())
@@ -166,8 +184,17 @@ def main():
         raise SystemExit("渲染失败")
 
     dur = probe_duration(a.out, ff)
-    print("base.mp4 完成  时长 %.2fs  镜头 %d  叠化 %.2fs"
-          % (dur, len(clips), a.fade))
+    print("base.mp4 完成  时长 %.3fs / 目标 %.3fs  镜头 %d  叠化 %.2fs"
+          % (dur, a.total, len(clips), a.fade))
+    report_path = os.path.join(a.work_dir, "build_report.json")
+    with open(report_path, "w", encoding="utf-8") as f:
+        json.dump(dict(target_duration=a.total, actual_duration=dur,
+                       duration_delta=dur - a.total, shots=len(clips),
+                       fade=a.fade, fps=a.fps, width=a.width, height=a.height,
+                       output=os.path.abspath(a.out)), f, ensure_ascii=False, indent=1)
+    if abs(dur - a.total) > 0.1:
+        raise SystemExit("基片与目标时长差 %.3fs，超过 0.1s；请检查时间线" % (dur - a.total))
+    print("时长验收通过（差 %.3fs），报告: %s" % (dur - a.total, report_path))
 
 
 if __name__ == "__main__":

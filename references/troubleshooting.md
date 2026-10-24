@@ -101,7 +101,9 @@ trim → setpts=PTS-STARTPTS → fps=24 → format=yuv420p → settb=AVTB
 
 ### 切点不在拍点上
 
-**检查**：`build_base.py` 会打印每个切点距拍点的偏移，应在 ±0.005s 内。
+**检查**：看 `timeline_report.json` 的 `snap_shifts`（吸附位移）和
+`qa_check.py` 的 `cut_lyric_alignment`。不要再把"对已吸附切点重新计算网格距离"
+当作验收，那个值在数学上恒接近 0。
 
 **原因**：分镜表的 `t1` 与前一行 `t0` 不连续（中间有缝或重叠）。
 脚本只取每行 `t0` 当切点，所以 `t1` 只用于判断首尾。

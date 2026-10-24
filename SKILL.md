@@ -1,6 +1,7 @@
 ---
 name: music-mv
 description: 把一首歌做成卡拍点、逐字弹字幕、字幕跟镜头联动的动画风 MV。当用户给出音频/歌曲，要求「做 MV / 音乐视频 / 歌词视频 / 卡点视频 / 给歌配画面 / 逐句配动画 / 字幕跟着画面走」，或需要分析歌曲 BPM 与拍点、切分歌词时间轴、批量出分镜图与图生视频、把多段素材按拍点拼成成片时使用。产出 16:9 或 9:16 的 MP4 + 封面。
+agent_created: true
 ---
 
 # 音乐 MV 生成
@@ -8,7 +9,7 @@ description: 把一首歌做成卡拍点、逐字弹字幕、字幕跟镜头联�
 把一首歌变成一支成片级别的动画 MV。核心链路：
 
 ```
-听歌定拍 → 定风格 → 校歌词 → 定分镜 → 出图 → 图生视频 → 卡拍剪时间线 → 逐字弹字幕 → 混音出片
+听歌定拍 → 定风格 → 校歌词 → 定分镜 → 草稿/试制确认 → 出图 → 图生视频 → 卡拍剪时间线 → 逐字弹字幕 → 混音出片 → 自动 QA
 ```
 
 本 skill 提供这条链路上的全部可执行脚本，以及一份"哪些地方必须人工判断"的清单。
@@ -62,10 +63,15 @@ project/
 │   ├── groups.json           # 歌词分组（人工）
 │   ├── lines_timing.json     # 逐句时间轴
 │   ├── shots.tsv             # 分镜表（人工）
+│   ├── storyboard.md         # 导演草稿（生成前确认门）
+│   ├── manifest.json         # 逐镜提示词、来源、成本与状态
 │   ├── cards.json            # 片头/片尾标题卡（可选）
 │   ├── lines.json            # 字幕条目
 │   ├── subs.ass              # 字幕文件
 │   ├── filter_base.txt       # 时间线滤镜脚本
+│   ├── timeline_report.json  # 吸附后切点、位移与慢放记录
+│   ├── build_report.json     # 基片实测时长验收
+│   ├── qa_report.json        # 交付前自动验收
 │   └── base.mp4              # 无字幕无音轨的基片
 ├── images/raw/  images/c16/  # 出图原图 / 统一裁切到 1920x1080
 ├── clips/                    # 每镜一段 mp4
@@ -122,10 +128,13 @@ python scripts/style_advisor.py --audio song.mp3 --lyrics lyrics.txt --title "�
    （百度百科 / 搜狗百科 / 互动百科 / 正规歌词站），不一致的以多数派为准并记录分歧。
 3. **中文歌词大约每 4-8 句就有 1 处错字**。逐字对着音频念一遍，别只看首尾。
 
-ASR 唯一可靠的产出是**段落边界**，用它把歌词切成"组"，组内按字数比例分配时间：
+ASR 唯一可靠的产出是**段落边界**，用它把歌词切成"组"，组内按字数比例分配时间。
+可选分段器会安装独立依赖，并且只输出边界、不采用识别文本：
 
 ```bash
-# 先人工写 groups.json（结构见 assets/groups.example.json）
+python -m pip install -r scripts/requirements-asr.txt
+python scripts/asr_segments.py --audio song.mp3 --lyrics lyrics.txt -o out/groups.json
+# 也可以完全人工写 groups.json（结构见 assets/groups.example.json）
 python scripts/lyrics_timing.py --groups out/groups.json --beats out/beats.json \
     -o out/lines_timing.json
 ```
@@ -139,20 +148,16 @@ python scripts/lyrics_timing.py --groups out/groups.json --beats out/beats.json 
 如果按字数比例去分第二遍的组，误差会逐句累积：本案例里第二遍从 +1.2s 一路涨到 +2.8s，
 表现为"从某一句开始字幕、音乐、画面全对不上"，而且越往后越严重。
 
-校验方法：
+校验方法（句号区间按歌曲实际结构填写，不要对半猜）：
 
 ```bash
-# 打印每句的 s/字，两遍同一句应当接近
-python -c "
-import json
-L=json.load(open('out/lines_timing.json'))
-for a,b in zip(L[:len(L)//2], L[len(L)//2:]):
-    print('%6.2f %6.2f  差 %+.2f  %s' % (a['start'], b['start'], b['start']-a['start'], a['text'][:14]))
-"
+python scripts/check_repeat.py --timing out/lines_timing.json \
+    --first 1-18 --second 19-36
 ```
 
-差值是常数（本案例 94.5s）才对。**发现逐句递增，就说明第二遍的组边界估早了**，
-直接把第二遍改成 `第一遍 + 常数`，不要重新分配。
+差值是常数（本案例 94.5s）才对。**发现逐句递增，就说明第二遍的组边界估早了**。
+需要修正时加 `--fix-out out/lines_timing.fixed.json`，脚本会按
+`第一遍 + 中位偏移` 重建第二遍；人工抽查后再替换，并重建整条字幕/时间线链。
 
 更硬的校验方法见 [references/lyrics-accuracy.md](references/lyrics-accuracy.md) 的
 "用 OCR 读原片歌词"一节。
@@ -184,21 +189,38 @@ s01     0.00    10.50   T               牌坊下的黄昏              镜头�
 - **无配词的镜头**（前奏、间奏、尾奏）：随便切，按节奏铺
 - `t1` 永远等于下一镜的 `t0`，不要手写
 
-自检：
+自检（此时只有 `lines_timing.json`，不要引用第 8 步才生成的 `lines.json`）：
 
 ```bash
 python -c "
 import json, csv
-L=[x for x in json.load(open('out/lines.json')) if x.get('shot')]
-S={r['id']:(float(r['t0']),float(r['t1'])) for r in csv.DictReader(open('out/shots.tsv'),delimiter='\t')}
-d=[abs(S[x['shot']][0]-x['start']) for x in L]
-print('切点与歌词起点最大偏差 %.4fs' % max(d))"
+L=json.load(open('out/lines_timing.json'))
+R=[r for r in csv.DictReader(open('out/shots.tsv',encoding='utf-8-sig'),delimiter='\t') if r['lyric'].strip()]
+d=[abs(float(r['t0'])-l['start']) for r,l in zip(R,L)]
+print('配词镜头数',len(R),'歌词句数',len(L),'切点最大偏差 %.4fs' % max(d))"
 ```
 
-大于 0.1s 就要返工。`build_base.py --grid-div 4` 会把切点吸到 1/4 拍网格，
-和歌词起点同一网格，残差能压到 0.005s 以内。
+配词镜头数必须等于歌词句数，偏差大于 0.1s 就要返工。`build_base.py --grid-div 4`
+会把切点吸到与歌词相同的 1/4 拍网格；吸附后的真实偏差由第 10 步
+`qa_check.py` 使用 `timeline_report.json` 再验一次。
 
 分镜数量参考：全曲逐句 = 歌词句数 + 前奏 1-3 镜 + 尾奏 0-2 镜。
+
+### 出图前先过两道确认门
+
+**Gate A：导演草稿。** 生成 `storyboard.md` 和逐镜 `manifest.json`：
+
+```bash
+python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
+    --style cel --width 1920 --height 1080 -o out/manifest.json
+```
+
+让用户确认参考图、角色设计、分镜、字幕位置和成本；不要只让用户确认一个风格名称。
+
+**Gate B：试制。** 先做 2-3 个代表镜头（特写 / 中景 / 空景）并拼 10-15 秒样片，
+确认画风、主体尺度、字幕位置、图生视频稳定性和 `REVEAL`，再批量做全曲。
+这两道门把"全片返工"降级为"两镜返工"。完整执行细则见
+[references/production-playbook.md](references/production-playbook.md)。
 
 ## 第 5 步：出图
 
@@ -214,6 +236,12 @@ print('切点与歌词起点最大偏差 %.4fs' % max(d))"
 - 出图工具的 `output_dir` 参数经常被忽略，产物会落到默认目录，别指望它
 
 出完统一裁到目标分辨率（`images/c16/`），避免时间线里再缩放。
+每镜立即登记提示词与状态，便于只重做该镜：
+
+```bash
+python scripts/manifest.py update -m out/manifest.json --shot s01 \
+    --status image_done --image images/c16/s01.png --image-prompt "S01 ..."
+```
 
 ## 第 6 步：图生视频
 
@@ -234,11 +262,20 @@ print('切点与歌词起点最大偏差 %.4fs' % max(d))"
 - 额度会用尽（HTTP 429 `code 14018`）。**兜底方案**：用静帧 + `zoompan` 缓推，
   能撑住时间线，但那一镜没有真实运动——要在交付时主动说明
 
+完成后登记来源；`still` 会在 QA 与交付报告中单独列出：
+
+```bash
+python scripts/manifest.py update -m out/manifest.json --shot s01 \
+    --status done --source i2v --credits 93 --video-prompt "Animate ..."
+# 静帧兜底时改为 --source still --note "429，zoompan 兜底"
+```
+
 ## 第 7 步：卡拍剪时间线
 
 ```bash
 python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
-    --beats out/beats.json --total 255.814 --fade 0.45 \
+    --beats out/beats.json --audio song.mp3 --fade 0.45 \
+    --width 1920 --height 1080 \
     --fill-ids s02,s10,s04,s27 -o out/base.mp4
 ```
 
@@ -250,9 +287,12 @@ python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
    `trim=duration` 会提前结束，xfade 链在那里断掉，后续镜头被静默丢弃
    （本案例里这个 bug 让成片短了 26 秒）
 4. 尾奏（歌词唱完之后那几十秒）用 `--fill-ids` 指定的镜头循环填满。
-   填充镜头本身要够长，否则会被大幅慢放
+   填充镜头本身要够长，否则会被大幅慢放；默认超过 1.3 倍会中止，
+   需要拆镜或换素材，不要用 `--max-slow 0` 掩盖问题
+5. xfade 链末尾先补帧再裁到音频时长，修复旧版固定少 `fade/2` 的问题；
+   实测时长写入 `out/build_report.json`，差超过 0.1s 会失败
 
-`--total` 必须等于音频时长，否则音画会错位。
+`--audio` 会自动读取总时长；只有明确需要覆盖时才手填 `--total`。
 
 ## 第 8 步：逐字弹字幕
 
@@ -260,8 +300,12 @@ python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
 python scripts/build_lines.py --timing out/lines_timing.json --shots out/shots.tsv \
     --cards out/cards.json -o out/lines.json
 python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
-    --motifs -o out/subs.ass
+    --motifs --width 1920 --height 1080 -o out/subs.ass
 ```
+
+竖屏用 `--width 1080 --height 1920` 重新生成 ASS，脚本会重算字号、行位置、
+字距与装饰尺寸；不要把 16:9 的 ASS 直接拉伸到 9:16。脚本现在打印
+"首字相对句起点"和"末字落点/句长"，它们替代旧版恒真的网格偏移自检。
 
 `--motifs` 会按歌词意象在句子左侧挂矢量小图案（气泡/爱心/气球/太阳/票根…），
 不需要图片素材。细节与扩展方法见
@@ -291,7 +335,7 @@ python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
 
 ```bash
 python scripts/mix_final.py --base out/base.mp4 --audio song.mp3 --subs out/subs.ass \
-    --duration 255.58 --out "成片.mp4"
+    --out "成片.mp4"
 ```
 
 （或者按 [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md) 手写滤镜串）
@@ -301,21 +345,39 @@ python scripts/mix_final.py --base out/base.mp4 --audio song.mp3 --subs out/subs
 **必须**补一个 `aresample` 回到 44.1k。
 
 验收线：`mean_volume` 约 −14~−15dB，`max_volume` ≤ −1.0dB。
+`--delogo` 现在默认 `off`；只有确认水印位置后才显式传 `x:y:w:h`，
+不要对无水印素材默认抹一块。封面单独生成：
+
+```bash
+python scripts/make_cover.py --image images/c16/s12.png \
+    --title "歌名" --artist "歌手" --width 1920 --height 1080 --out out/cover.png
+```
 
 ## 第 10 步：交付前自查
 
-**机械项**（脚本会打印，看数字即可）
+先跑自动验收与视觉联系表：
 
-- [ ] 音频时长与视频时长差 < 0.1s
-- [ ] 切点与歌词起点最大偏差 < 0.1s（见第 4 步的自检命令）
-- [ ] 复唱段落两遍的偏移是常数（见第 3 步，不是递增就不是常数）
-- [ ] 切点全部落在 1/4 拍网格上（`build_base.py` 打印误差应 < 0.005s）
+```bash
+python scripts/qa_check.py --project . --audio song.mp3 --final "成片.mp4"
+python scripts/contact_sheet.py --images 'images/c16/s*.png' \
+    --out out/qa/style_sheet.png --cols 7
+python scripts/contact_sheet.py --video "成片.mp4" \
+    --out out/qa/film_sheet.png --count 12 --cols 4
+python scripts/manifest.py report -m out/manifest.json
+```
+
+**机械项**（由 `qa_check.py` 判定；FAIL 必须处理）
+
+- [ ] 基片与目标时长差 < 0.1s；成片与音频时长差 < 0.1s
+- [ ] 切点与歌词起点最大偏差 < 0.1s（优先使用吸附后的真实切点）
+- [ ] 复唱段落两遍的偏移是常数（用 `check_repeat.py`，不要对半猜）
+- [ ] 相邻歌词字幕不重叠，没有标记完成却缺失的素材
 - [ ] 音量：`mean` 约 −14~−15dB，`max` ≤ −1.0dB
+- [ ] 吸附位移只看 INFO 报告，不再把"对已吸附网格再算距离"当验收
 
 **目视项**（必须真的看图，不能靠推断）
 
-- [ ] 全片风格总览：`ffmpeg -pattern_type glob -i 'images/c16/s*.png' -vf "scale=248:140,tile=7x6" -frames:v 1 sheet.png`，
-      逐格扫一遍，没有风格孤岛
+- [ ] 全片风格总览：逐格扫 `out/qa/style_sheet.png`，没有风格孤岛
 - [ ] 逐句抽查 3 个时间点，字幕、唱词、画面三者一致
 - [ ] 字幕没有压住人脸（重点看特写镜）
 - [ ] 片头歌名、歌手名完整出现且停留 ≥ 3s，不被淡出吃掉
@@ -340,4 +402,11 @@ python scripts/mix_final.py --base out/base.mp4 --audio song.mp3 --subs out/subs
 
 全曲逐句（约 40 镜）：40 张图 + 40 段 5-6s 视频。按常见额度，
 出图约 8 credits/张，出视频约 85 credits/段，合计约 **4000 credits**。
-开工前把量级告诉用户，别做完才说。
+开工前把量级告诉用户，别做完才说。实际消耗逐镜写进 manifest，
+交付时用 `manifest.py report` 对比预估，并列出静帧兜底与复用镜头。
+
+## 零额度回归
+
+每次改动脚本后，先运行 `python examples/make_demo.py --out out/demo`。
+它用程序生成音频和画面，完整验证分镜、字幕、渲染、封面、联系表与 QA，
+不消耗任何出图/视频额度。

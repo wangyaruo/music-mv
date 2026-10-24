@@ -44,6 +44,12 @@ def probe_duration(path, ff):
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
 
 
+def filter_path(path):
+    """转义 ffmpeg 滤镜参数里的路径，避免空格、冒号和 Windows 盘符断链。"""
+    return (os.path.abspath(path).replace("\\", "\\\\")
+            .replace(":", "\\:").replace("'", "\\'"))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True, help="无字幕无音轨的基片")
@@ -52,8 +58,8 @@ def main():
     ap.add_argument("--duration", type=float, default=0.0, help="成片时长，0=自动取音频时长")
     ap.add_argument("--out", "-o", default="out/final.mp4")
     ap.add_argument("--fontsdir", default="")
-    ap.add_argument("--delogo", default="4:6:134:62",
-                    help="水印位置 x:y:w:h，写 off 关闭")
+    ap.add_argument("--delogo", default="off",
+                    help="水印位置 x:y:w:h；默认 off，确认有水印时再显式提供")
     ap.add_argument("--eq", default="contrast=1.04:saturation=1.06")
     ap.add_argument("--vignette", default="a=PI/9", help="暗角强度，off 关闭")
     ap.add_argument("--fade-in", type=float, default=1.2)
@@ -62,6 +68,7 @@ def main():
     ap.add_argument("--true-peak", type=float, default=-1.0)
     ap.add_argument("--lra", type=float, default=11.0)
     ap.add_argument("--crf", type=int, default=18)
+    ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--preset", default="slow")
     ap.add_argument("--ffmpeg", default="")
     a = ap.parse_args()
@@ -69,10 +76,14 @@ def main():
     ff = a.ffmpeg or ffmpeg_exe()
 
     dur = a.duration
+    base_dur = probe_duration(a.base, ff)
     if dur <= 0:
         dur = probe_duration(a.audio, ff)
         if not dur:
             raise SystemExit("无法读取音频时长，请显式给 --duration")
+    if base_dur and abs(base_dur - dur) > 0.1:
+        print("⚠ 基片 %.3fs 与目标 %.3fs 相差 %.3fs；请先检查 build_base 的时长验收"
+              % (base_dur, dur, base_dur - dur))
 
     # 视频链
     v = []
@@ -86,7 +97,7 @@ def main():
     if a.subs:
         fd = a.fontsdir or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "..", "assets", "fonts")
-        v.append("ass=%s:fontsdir='%s'" % (os.path.abspath(a.subs), os.path.abspath(fd)))
+        v.append("ass=filename='%s':fontsdir='%s'" % (filter_path(a.subs), filter_path(fd)))
     if a.fade_in > 0:
         v.append("fade=t=in:st=0:d=%.2f" % a.fade_in)
     if a.fade_out > 0:
@@ -115,7 +126,7 @@ def main():
     cmd = [ff, "-hide_banner", "-y", "-i", a.base, "-i", a.audio,
            "-filter_complex_script", fpath, "-map", "[v]", "-map", "[a]",
            "-c:v", "libx264", "-preset", a.preset, "-crf", str(a.crf),
-           "-pix_fmt", "yuv420p", "-r", "24",
+           "-pix_fmt", "yuv420p", "-r", str(a.fps),
            "-c:a", "aac", "-b:a", "192k",
            "-t", "%.3f" % dur, "-movflags", "+faststart", a.out]
     p = subprocess.run(cmd, capture_output=True, text=True)

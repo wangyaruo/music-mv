@@ -13,6 +13,10 @@ images/
 !assets/*.tsv
 !assets/fonts/*.ttf
 
+# README 的 demo 视觉证据可以进仓库（不是用户素材）
+!docs/images/
+!docs/images/*.png
+
 # Python
 __pycache__/
 *.py[cod]
