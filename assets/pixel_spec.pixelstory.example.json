@@ -1,0 +1,101 @@
+{
+  "style": "pixelstory",
+  "projection": "side_scrolling",
+  "world": {
+    "width": 320,
+    "height": 180,
+    "scale": 6,
+    "tile": 16
+  },
+  "output": {
+    "width": 1920,
+    "height": 1080
+  },
+  "character_sprite": {
+    "frame_width": 24,
+    "frame_height": 32,
+    "foot_anchor": [12, 31]
+  },
+  "layers": [
+    "background",
+    "actors",
+    "foreground",
+    "weather",
+    "hud",
+    "subtitles"
+  ],
+  "narrative": {
+    "state_channels": ["world", "p2", "letter", "time_of_day"],
+    "opening": "1P_START",
+    "key_prop": "letter",
+    "result": "care_ok_laugh_ok_confession_unfinished",
+    "reality_rules": {
+      "day": "memory",
+      "night": "present"
+    }
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "action": "walk",
+      "camera": "fixed",
+      "cycle": [0, 1, 0, 1],
+      "frame_ms": [180, 180, 180, 180],
+      "path_clear": true,
+      "occlusion": "side_layers",
+      "story_state": {
+        "world": "1-1",
+        "time_of_day": "night",
+        "reality": "present"
+      },
+      "state_change": {
+        "girl": "on_bus_to_leaving",
+        "p2": "inactive_to_gray"
+      },
+      "characters": 2,
+      "composition": {
+        "distance": "hero_outside_left_girl_inside_right",
+        "barrier": "bus_window"
+      },
+      "environment_loops": ["bus_passing", "star_twinkle"],
+      "background_morph": false
+    },
+    {
+      "id": "s02",
+      "action": "prop",
+      "camera": "fixed",
+      "key_poses": [4, 5, 6],
+      "prop": "letter",
+      "prop_state_after": "one_character_written_and_unsent",
+      "story_state": {
+        "world": "2-1",
+        "time_of_day": "night",
+        "reality": "present"
+      },
+      "state_change": {
+        "letter": "blank_to_unsent",
+        "text": "none_to_single_character"
+      },
+      "characters": 1,
+      "environment_loops": ["paper_glow"],
+      "background_morph": false
+    },
+    {
+      "id": "s03",
+      "action": "idle",
+      "camera": "fixed",
+      "idle_foot_lock": true,
+      "story_state": {
+        "world": "4-1",
+        "time_of_day": "night",
+        "reality": "present"
+      },
+      "state_change": {
+        "result": "hidden_to_care_ok_laugh_ok_confession_unfinished"
+      },
+      "characters": 1,
+      "environment_loops": ["window_light"],
+      "background_morph": false
+    }
+  ]
+}

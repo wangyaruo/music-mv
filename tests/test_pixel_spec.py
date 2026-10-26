@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""星露谷像素规格与图像级审计的回归测试。"""
+"""星露谷与横版像素剧情规格、图像级审计的回归测试。"""
 
 import copy
 import json
@@ -20,6 +20,12 @@ import style_advisor  # noqa: E402
 
 def example_spec():
     with open(os.path.join(ROOT, "assets", "pixel_spec.stardew.example.json"),
+              encoding="utf-8") as f:
+        return json.load(f)
+
+
+def pixelstory_spec():
+    with open(os.path.join(ROOT, "assets", "pixel_spec.pixelstory.example.json"),
               encoding="utf-8") as f:
         return json.load(f)
 
@@ -55,6 +61,44 @@ class PixelSpecTests(unittest.TestCase):
         errors = pixel_spec.validate_spec(spec)
         self.assertTrue(any("prepare/contact/recover" in e for e in errors))
         self.assertTrue(any("目标处反馈" in e for e in errors))
+
+
+class PixelStorySpecTests(unittest.TestCase):
+    def test_pixelstory_example_is_valid(self):
+        self.assertEqual(pixel_spec.validate_spec(pixelstory_spec()), [])
+
+    def test_pixelstory_rejects_top_down_projection(self):
+        spec = pixelstory_spec()
+        spec["projection"] = "three_quarter_top_down"
+        self.assertTrue(any("projection" in e for e in pixel_spec.validate_spec(spec)))
+
+    def test_pixelstory_requires_two_to_four_state_channels(self):
+        spec = pixelstory_spec()
+        spec["narrative"]["state_channels"] = ["score"]
+        self.assertTrue(any("2–4 个状态通道" in e for e in pixel_spec.validate_spec(spec)))
+
+    def test_pixelstory_requires_visible_state_change(self):
+        spec = pixelstory_spec()
+        spec["shots"][0]["state_change"] = {}
+        self.assertTrue(any("state_change" in e for e in pixel_spec.validate_spec(spec)))
+
+    def test_pixelstory_requires_relationship_composition(self):
+        spec = pixelstory_spec()
+        spec["shots"][0]["composition"] = {}
+        self.assertTrue(any("distance" in e for e in pixel_spec.validate_spec(spec)))
+
+    def test_pixelstory_gesture_requires_real_poses(self):
+        spec = pixelstory_spec()
+        shot = copy.deepcopy(spec["shots"][0])
+        shot.update(action="gesture", gesture="wave", key_poses=[4, 4], characters=1,
+                    composition={})
+        spec["shots"].append(shot)
+        self.assertTrue(any("2 个不同姿态" in e for e in pixel_spec.validate_spec(spec)))
+
+    def test_pixelstory_prop_requires_result_state(self):
+        spec = pixelstory_spec()
+        spec["shots"][1]["prop_state_after"] = ""
+        self.assertTrue(any("prop_state_after" in e for e in pixel_spec.validate_spec(spec)))
 
 
 class SpriteAuditTests(unittest.TestCase):
@@ -126,6 +170,13 @@ class StyleRegistrationTests(unittest.TestCase):
         self.assertIn("pixel", style_advisor.STYLES)
         self.assertLess(style_advisor.STYLES["stardew"]["bpm"][0],
                         style_advisor.STYLES["pixel"]["bpm"][0])
+
+    def test_pixelstory_is_registered_with_its_own_projection(self):
+        self.assertIn("pixelstory", style_advisor.STYLES)
+        self.assertEqual(pixel_spec.STYLE_RULES["pixelstory"]["projection"],
+                         "side_scrolling")
+        self.assertNotEqual(pixel_spec.STYLE_RULES["pixelstory"]["projection"],
+                            pixel_spec.STYLE_RULES["stardew"]["projection"])
 
 
 if __name__ == "__main__":

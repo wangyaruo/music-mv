@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""星露谷式像素规格、sprite 轮廓与整数缩放校验。
+"""星露谷与横版像素剧情规格、sprite 轮廓与整数缩放校验。
 
 三个命令互不替代：
 - check：只检查 pixel_spec.json 的结构与动作合同，不证明画面合格。
@@ -18,19 +18,29 @@ import zlib
 
 import numpy as np
 
-PROJECTION = "three_quarter_top_down"
+STYLE_RULES = {
+    "stardew": dict(
+        projection="three_quarter_top_down", sprite_key="farmer_sprite",
+        sprite_size=(16, 32), walk_min=3, occlusion="foot_y_sort",
+        layers={"back", "buildings", "paths", "actors", "front", "always_front",
+                "lighting", "hud", "subtitles"}),
+    "pixelstory": dict(
+        projection="side_scrolling", sprite_key="character_sprite",
+        sprite_size=None, walk_min=2, occlusion="side_layers",
+        layers={"background", "actors", "foreground", "weather", "hud", "subtitles"}),
+}
 CAMERAS = {"fixed", "pixel_pan", "cut"}
-LAYERS = {"back", "buildings", "paths", "actors", "front", "always_front",
-          "lighting", "hud", "subtitles"}
 
 
 def validate_spec(spec):
     """返回配置错误；通过此项不代表图像或视频已经通过视觉验收。"""
     errors = []
-    if spec.get("style") != "stardew":
-        errors.append("style 必须为 stardew；其他像素子风格应使用独立规格")
-    if spec.get("projection") != PROJECTION:
-        errors.append("projection 必须为 three_quarter_top_down，禁止横版或等距投影")
+    style = spec.get("style")
+    if style not in STYLE_RULES:
+        return ["style 必须为 stardew 或 pixelstory；其他像素子风格应使用独立规格"]
+    rule = STYLE_RULES[style]
+    if spec.get("projection") != rule["projection"]:
+        errors.append("%s 的 projection 必须为 %s" % (style, rule["projection"]))
 
     world = spec.get("world", {})
     output = spec.get("output", {})
@@ -48,21 +58,34 @@ def validate_spec(spec):
     if str(scale) != str(world.get("scale", scale)):
         errors.append("scale 必须为整数，不能是非整数缩放")
     if world.get("tile") != 16:
-        errors.append("stardew 地图设计 tile 必须为 16×16")
+        errors.append("像素地图设计 tile 必须为 16×16；画面边缘允许部分 tile")
 
-    sprite = spec.get("farmer_sprite", {})
-    if (sprite.get("frame_width"), sprite.get("frame_height")) != (16, 32):
+    sprite = spec.get(rule["sprite_key"], {})
+    fw, fh = sprite.get("frame_width"), sprite.get("frame_height")
+    if not isinstance(fw, int) or not isinstance(fh, int) or fw <= 0 or fh <= 0:
+        errors.append("%s 的 frame_width/frame_height 必须为正整数" % rule["sprite_key"])
+        fw = fh = 0
+    if rule["sprite_size"] and (fw, fh) != rule["sprite_size"]:
         errors.append("农夫型主角素材框必须为 16×32")
     anchor = sprite.get("foot_anchor")
     if (not isinstance(anchor, list) or len(anchor) != 2 or
             not all(isinstance(v, int) for v in anchor) or
-            not (0 <= anchor[0] < 16 and 0 <= anchor[1] < 32)):
+            not (0 <= anchor[0] < fw and 0 <= anchor[1] < fh)):
         errors.append("foot_anchor 必须是素材框内的整数 [x,y] 脚点")
 
     layers = set(spec.get("layers", []))
-    missing = sorted(LAYERS - layers)
+    missing = sorted(rule["layers"] - layers)
     if missing:
         errors.append("缺少独立图层: " + ", ".join(missing))
+
+    if style == "pixelstory":
+        narrative = spec.get("narrative", {})
+        channels = narrative.get("state_channels", [])
+        if not 2 <= len(channels) <= 4:
+            errors.append("pixelstory 必须选择 2–4 个状态通道，不能只挂无意义 HUD")
+        for field in ("opening", "key_prop", "result"):
+            if not narrative.get(field):
+                errors.append("pixelstory narrative 缺少 %s" % field)
 
     shots = spec.get("shots")
     if not isinstance(shots, list) or not shots:
@@ -70,7 +93,9 @@ def validate_spec(spec):
         return errors
     for i, shot in enumerate(shots):
         sid = shot.get("id", "shots[%d]" % i)
-        for field in ("season", "time", "weather", "action", "camera"):
+        required = ("action", "camera") if style == "pixelstory" else (
+            "season", "time", "weather", "action", "camera")
+        for field in required:
             if not shot.get(field):
                 errors.append("%s 缺少 %s" % (sid, field))
         camera = shot.get("camera")
@@ -79,8 +104,9 @@ def validate_spec(spec):
         action = shot.get("action")
         if action in {"walk", "run"}:
             cycle = shot.get("cycle", [])
-            if len(cycle) < 3 or len(set(cycle)) < 3:
-                errors.append("%s 完整步态至少需要 3 个不同姿态索引" % sid)
+            minimum = rule["walk_min"]
+            if len(cycle) < minimum or len(set(cycle)) < minimum:
+                errors.append("%s 完整步态至少需要 %d 个不同姿态索引" % (sid, minimum))
             ms = shot.get("frame_ms", [])
             if len(ms) != len(cycle) or any(not isinstance(v, (int, float)) or v <= 0 for v in ms):
                 errors.append("%s frame_ms 必须与 cycle 等长且全部为正数" % sid)
@@ -90,19 +116,41 @@ def validate_spec(spec):
                 errors.append("%s 工具动作必须按 prepare/contact/recover 排列" % sid)
             if not shot.get("target_feedback"):
                 errors.append("%s 工具动作缺少目标处反馈" % sid)
+        elif action in {"gesture", "prop"} and style == "pixelstory":
+            poses = shot.get("key_poses", [])
+            if len(poses) < 2 or len(set(poses)) < 2:
+                errors.append("%s 关键动作至少需要 2 个不同姿态索引" % sid)
+            if action == "gesture" and not shot.get("gesture"):
+                errors.append("%s 缺少 gesture 动作名称" % sid)
+            if action == "prop":
+                if not shot.get("prop"):
+                    errors.append("%s 道具动作缺少 prop" % sid)
+                if not shot.get("prop_state_after"):
+                    errors.append("%s 道具动作缺少 prop_state_after" % sid)
         elif action == "idle":
             if not shot.get("idle_foot_lock"):
                 errors.append("%s 待机必须锁定脚点，禁止整体正弦浮动" % sid)
         elif action == "environment":
             if not shot.get("environment_loops"):
                 errors.append("%s 环境镜头必须指定局部动画区域" % sid)
-        elif action not in {"walk", "run", "tool", "idle", "environment", None}:
-            errors.append("%s 未知 action: %s" % (sid, action))
+        else:
+            errors.append("%s 未知或该风格不支持 action: %s" % (sid, action))
         if action in {"walk", "run", "tool"}:
             if shot.get("path_clear") is not True:
                 errors.append("%s 必须确认至少一格宽的连续通路" % sid)
-            if shot.get("occlusion") != "foot_y_sort":
-                errors.append("%s 必须按脚点前后关系处理遮挡" % sid)
+            if shot.get("occlusion") != rule["occlusion"]:
+                errors.append("%s 遮挡规则必须为 %s" % (sid, rule["occlusion"]))
+        if style == "pixelstory":
+            state = shot.get("story_state", {})
+            for field in ("world", "time_of_day", "reality"):
+                if not state.get(field):
+                    errors.append("%s story_state 缺少 %s" % (sid, field))
+            if not isinstance(shot.get("state_change"), dict) or not shot["state_change"]:
+                errors.append("%s 必须有可见的 state_change，不能只换背景" % sid)
+            if shot.get("characters", 1) > 1:
+                composition = shot.get("composition", {})
+                if not composition.get("distance"):
+                    errors.append("%s 多人构图必须明确 distance 关系" % sid)
         if shot.get("background_morph"):
             errors.append("%s 禁止整背景同步扭动" % sid)
     return errors

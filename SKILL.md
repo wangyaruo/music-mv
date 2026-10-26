@@ -120,7 +120,8 @@ python scripts/style_advisor.py --audio song.mp3 --lyrics lyrics.txt --title "�
 ### 像素风先锁子类型与动作合同
 
 不要只写“像素风”。先确定投影、原生网格、角色素材框、脚点、整数缩放和动作实现方式；
-星露谷式田园像素使用独立的 `stardew` 候选，不要与街机横版 `pixel` 混用。
+星露谷式田园像素使用独立的 `stardew` 候选，横版情感叙事使用 `pixelstory`，
+三者不要与街机横版 `pixel` 混用。
 
 选择 `stardew` 时必读 [references/stardew-pixel.md](references/stardew-pixel.md)，并先完成
 `out/pixel_spec.json`：
@@ -134,6 +135,12 @@ python scripts/pixel_spec.py check out/pixel_spec.json
 硬约束：3/4 俯视而非横版或等距菱形；16×16 地图格、16×32 农夫型素材框、
 脚点定位、独立前景遮挡；行走至少 3 个真实轮廓；工具动作有准备/接触/恢复和目标反馈；
 世界层整数倍最近邻放大。高清图缩小、像素化滤镜和 zoompan 不能代替这些资产与动作。
+
+选择 `pixelstory` 时必读 [references/pixel-narrative.md](references/pixel-narrative.md)，
+使用 `assets/pixel_spec.pixelstory.example.json`。先写每镜 `story_state` 与
+`state_change`，再写画面：选择 2–4 个状态通道，保留一个关键道具及其结果状态，
+用开场与结算形成闭环。多人镜头必须明确距离/遮挡；关键手势和道具动作必须有真实姿态，
+不能只给静态街景挂爱心和 SCORE。
 
 ## 第 3 步：先把歌词的字搞对
 
@@ -240,6 +247,8 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 **Gate B：试制。** 先做 2-3 个代表镜头（特写 / 中景 / 空景）并拼 10-15 秒样片，
 确认画风、主体尺度、字幕位置、图生视频稳定性和 `REVEAL`，再批量做全曲。
 `stardew` 试制至少包含一个完整步态和一个工具接触动作；只展示静态场景不算通过。
+`pixelstory` 试制至少包含一个关键手势、一个多人距离构图和一个道具状态插页，
+并让用户复述其理解的关系变化；只读出“像素游戏”而不能读出剧情，不算通过。
 这两道门把"全片返工"降级为"两镜返工"。完整执行细则见
 [references/production-playbook.md](references/production-playbook.md)。
 
@@ -262,6 +271,8 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 方向性 sprite、前景遮挡与局部环境动画层；AI 只探索构图和姿态，入库前必须清理到
 原生网格并按脚点配准。`stardew` 使用 16×16 地图格、16×32 农夫型素材框和独立
 `pixel_spec.json`，详细规则与提示词见 [references/stardew-pixel.md](references/stardew-pixel.md)。
+`pixelstory` 还需先完成场景复用矩阵、2–4 个状态通道、多人距离构图和关键道具插页，
+见 [references/pixel-narrative.md](references/pixel-narrative.md)。
 
 每镜立即登记提示词与状态，便于只重做该镜：
 
@@ -405,6 +416,9 @@ python scripts/pixel_spec.py audit-sprites images/farmer_walk.png \
     --frame-width 16 --frame-height 32 --cycle 0,1,0,2 --min-distinct 3
 # 在光照、HUD、字幕和视频编码前检查无损世界素材层
 python scripts/pixel_spec.py audit-scale images/world_layer.png --scale 4
+# pixelstory 普通行走至少 2 个轮廓；关键手势/道具动作另按合同提高要求
+python scripts/pixel_spec.py audit-sprites images/hero_walk.png \
+    --frame-width 24 --frame-height 32 --cycle 0,1,0,1 --min-distinct 2
 ```
 
 **机械项**（由 `qa_check.py` 判定；FAIL 必须处理）
@@ -427,6 +441,8 @@ python scripts/pixel_spec.py audit-scale images/world_layer.png --scale 4
 - [ ] `stardew` 没有横版化、等距菱形化或高清图马赛克化；脚点、遮挡和连续通路正确
 - [ ] 行走有真实左右腿交替；工具有接触动作与目标反馈；待机不漂浮、背景不整体扭动
 - [ ] 季节/时间/天气与植被、作物、装饰一致；夜景灯具和窗户有局部光照响应
+- [ ] `pixelstory` 的 2–4 个状态通道与人物行为一致，复唱有状态推进，不是只换背景
+- [ ] 多人镜头能读出距离/遮挡；关键道具插页有结果；开场与结算共享同一套叙事规则
 
 ## 排错
 

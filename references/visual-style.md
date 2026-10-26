@@ -14,6 +14,8 @@
 > 原生 tile/sprite 资产和真实动作。选择 `stardew` 时先读
 > [stardew-pixel.md](stardew-pixel.md)，按 3/4 俯视、16×16 地图格、16×32 农夫型
 > 素材框、脚点遮挡和整数缩放执行；不要用高清图缩小或 zoompan 冒充像素动画。
+> 横版情感叙事使用独立的 `pixelstory`，还需先读 [pixel-narrative.md](pixel-narrative.md)，
+> 锁定状态通道、场景复用矩阵、多人距离构图和道具/结算闭环。
 
 ## 一、风格必须在出图前一次定死
 
