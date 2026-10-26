@@ -10,6 +10,11 @@
 > `python scripts/style_advisor.py --audio song.mp3 --pick cel` 会直接打印
 > 这套锁定参数，照抄进分镜表即可。
 
+> **像素风例外：**本文的高清分镜图与图生视频方法只适用于像素构图探索，不能替代
+> 原生 tile/sprite 资产和真实动作。选择 `stardew` 时先读
+> [stardew-pixel.md](stardew-pixel.md)，按 3/4 俯视、16×16 地图格、16×32 农夫型
+> 素材框、脚点遮挡和整数缩放执行；不要用高清图缩小或 zoompan 冒充像素动画。
+
 ## 一、风格必须在出图前一次定死
 
 返工成本 = 全片成本。

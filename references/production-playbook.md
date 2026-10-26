@@ -27,7 +27,9 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 - 图生视频是否换衣服、推镜是否可接受；
 - 逐字字幕的 `REVEAL` 是否适合这首歌。
 
-试制的意义是把"全片返工"改成"两镜返工"。
+试制的意义是把"全片返工"改成"两镜返工"。`stardew` 试制还必须包含完整步态与
+工具接触动作，并通过 `pixel_spec.py` 的配置、sprite 轮廓和整数缩放检查；
+只确认静态场景，不能证明像素动画路线可行。
 
 ## 二、逐镜 manifest：可复现、可续做、可交代
 

@@ -65,6 +65,10 @@ python examples/make_demo.py --out out/demo
 python scripts/beat_sync.py song.mp3 -o out/beats.json
 python scripts/style_advisor.py --audio song.mp3 --lyrics lyrics.txt --title "歌名"
 
+# 星露谷式像素另做规格与图像验收；不要使用街机横版规格代替
+cp assets/pixel_spec.stardew.example.json out/pixel_spec.json
+python scripts/pixel_spec.py check out/pixel_spec.json
+
 # 2. 歌词时间轴（先人工核对歌词；可用 ASR 只生成段落边界草稿）
 # 可选：python -m pip install -r scripts/requirements-asr.txt
 # python scripts/asr_segments.py --audio song.mp3 --lyrics lyrics.txt -o out/groups.json
@@ -111,7 +115,7 @@ python scripts/manifest.py report -m out/manifest.json
 
 ## 内置风格库
 
-13 种，按 BPM / 发音点密度 / 明亮度 / 歌词意象四项打分排序，取前三给用户选。
+14 种，按 BPM / 发音点密度 / 明亮度 / 歌词意象四项打分排序，取前三给用户选。
 选定后 `--pick <id>` 输出单镜时长、叠化与字幕设计建议。
 
 | id | 风格 | BPM | 适合 |
@@ -125,7 +129,8 @@ python scripts/manifest.py report -m out/manifest.json
 | `flatvector` | 扁平矢量 | 96–150 | 快节奏、城市、舞台 |
 | `glass` | 彩绘玻璃 | 70–120 | 副歌爆发、誓言、光 |
 | `retroprint` | 复古丝网 | 84–130 | 青春回忆、校园、旧照片 |
-| `pixel` | 像素风 | 110–160 | 街机、闯关、电子快歌 |
+| `pixel` | 像素风（街机横版） | 110–160 | 街机、闯关、电子快歌 |
+| `stardew` | 星露谷式田园像素 | 58–108 | 农场、四季、日常劳动、温暖叙事 |
 | `glitch` | 赛博故障 | 100–150 | 电子编曲、失真、迷失 |
 | `vaporwave` | 蒸汽波 | 80–115 | 怀旧、褪色的夏天 |
 | `pencil` | 彩铅手绘 | 65–100 | 日记感、民谣、同桌 |
@@ -140,6 +145,7 @@ python scripts/manifest.py report -m out/manifest.json
 | `beat_sync.py` | BPM 与拍点网格（频谱通量 + 自相关 + 相位搜索） |
 | `song_structure.py` | 段落边界与分镜数量参考（**只作参考**，长副歌会误判） |
 | `style_advisor.py` | 按 tempo / 能量 / 亮度 / 歌词意象推荐 3 套画风 |
+| `pixel_spec.py` | 星露谷式像素规格、真实 sprite 轮廓与整数缩放校验 |
 | `lyrics_timing.py` | 歌词分组 → 逐句时间轴（锚点 + 字数比例 + 拍点吸附） |
 | `asr_segments.py` | 可选 faster-whisper 分段，只取边界、不采用识别文本 |
 | `check_repeat.py` | 复唱两遍的恒定偏移校验，可生成修正版时间轴 |
@@ -160,6 +166,7 @@ python scripts/manifest.py report -m out/manifest.json
 - [references/production-playbook.md](references/production-playbook.md) —— 两道确认门、manifest、QA、多画幅与交付纪律
 - [references/pipeline.md](references/pipeline.md) —— 数据结构、时间线数学、成本模型、真实案例复盘
 - [references/visual-style.md](references/visual-style.md) —— 画风锁定：从设计稿到 40 镜不跑偏
+- [references/stardew-pixel.md](references/stardew-pixel.md) —— 星露谷式投影、tile/sprite、动作、遮挡、光照与图像级验收
 - [references/lyrics-accuracy.md](references/lyrics-accuracy.md) —— 歌词校对，以及用 OCR 读原片歌词做时间轴校准
 - [references/subtitle-styling.md](references/subtitle-styling.md) —— ASS 版式、逐字节奏（`REVEAL`）、踩坑
 - [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md) —— 滤镜配方
@@ -187,6 +194,7 @@ GitHub Actions 会执行编译检查、单元测试和完整 demo。
   继续生产前必须人工核对，必要时修正 `beats.json`。
 - `song_structure.py` 会把长副歌判成一整段，分镜数量需要人工定。
 - 图生视频单段上限约 6 秒；默认慢放超过 1.3 倍会中止，需拆镜或更换素材。
+- `stardew` 不能只靠提示词或像素化滤镜实现；AI 构图和姿态候选仍需在原生网格中清理、配准并通过 sprite/缩放审计。
 - 逐字字幕需要 `libass` 支持内联标签，极老的 ffmpeg 可能有问题。
 - 示例 `shots.example.tsv` 保留了早期黏土版案例，仅用于数据结构对照；
   新项目的提示词必须遵循 `visual-style.md` 的三段式，不要照抄旧画风。

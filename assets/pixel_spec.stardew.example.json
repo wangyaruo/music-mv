@@ -1,0 +1,60 @@
+{
+  "style": "stardew",
+  "projection": "three_quarter_top_down",
+  "world": {
+    "width": 480,
+    "height": 270,
+    "scale": 4,
+    "tile": 16
+  },
+  "output": {
+    "width": 1920,
+    "height": 1080
+  },
+  "farmer_sprite": {
+    "frame_width": 16,
+    "frame_height": 32,
+    "foot_anchor": [8, 31]
+  },
+  "layers": [
+    "back",
+    "buildings",
+    "paths",
+    "actors",
+    "front",
+    "always_front",
+    "lighting",
+    "hud",
+    "subtitles"
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "action": "walk",
+      "season": "spring",
+      "time": "morning",
+      "weather": "sun",
+      "camera": "fixed",
+      "cycle": [0, 1, 0, 2],
+      "frame_ms": [200, 200, 200, 200],
+      "path_clear": true,
+      "occlusion": "foot_y_sort",
+      "environment_loops": ["river_edge", "foreground_leaves"],
+      "background_morph": false
+    },
+    {
+      "id": "s02",
+      "action": "tool",
+      "season": "summer",
+      "time": "evening",
+      "weather": "sun",
+      "camera": "pixel_pan",
+      "stages": ["prepare", "contact", "recover"],
+      "target_feedback": "water_contacts_soil_and_darkens_tilled_tiles",
+      "path_clear": true,
+      "occlusion": "foot_y_sort",
+      "environment_loops": ["chimney_smoke", "window_light"],
+      "background_morph": false
+    }
+  ]
+}

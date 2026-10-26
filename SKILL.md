@@ -65,6 +65,7 @@ project/
 │   ├── shots.tsv             # 分镜表（人工）
 │   ├── storyboard.md         # 导演草稿（生成前确认门）
 │   ├── manifest.json         # 逐镜提示词、来源、成本与状态
+│   ├── pixel_spec.json       # 像素项目专用：投影、网格、动作合同与状态层
 │   ├── cards.json            # 片头/片尾标题卡（可选）
 │   ├── lines.json            # 字幕条目
 │   ├── subs.ass              # 字幕文件
@@ -83,7 +84,7 @@ project/
 开工前必须问清三件事，缺一个就停下来问：
 
 1. **画幅** 16:9 / 9:16 / 1:1 —— 决定所有出图与出视频的比例，中途改等于重做
-2. **风格** 用 `style_advisor.py` 给 3 个候选让用户选，**不要自己拍板**
+2. **风格** 用 `style_advisor.py` 给 3 个候选让用户选，**不要自己拍板**；像素风还必须区分街机横版、星露谷式 3/4 俯视等子类型
 3. **规模** 全曲逐句，还是只做副歌？全曲逐句通常 30-45 镜，成本要提前说清
 
 风格一旦定了就不能中途换——换风格意味着 41 张图 + 41 段视频全部重做。
@@ -115,6 +116,24 @@ python scripts/style_advisor.py --audio song.mp3 --lyrics lyrics.txt --title "�
 
 给 3 套候选 + 打分 + 理由 + 建议单镜时长与叠化时长。拿给用户选，选定后记下
 `shot` 与 `fade` 两个参数，后面直接套用。
+
+### 像素风先锁子类型与动作合同
+
+不要只写“像素风”。先确定投影、原生网格、角色素材框、脚点、整数缩放和动作实现方式；
+星露谷式田园像素使用独立的 `stardew` 候选，不要与街机横版 `pixel` 混用。
+
+选择 `stardew` 时必读 [references/stardew-pixel.md](references/stardew-pixel.md)，并先完成
+`out/pixel_spec.json`：
+
+```bash
+cp assets/pixel_spec.stardew.example.json out/pixel_spec.json
+# 按实际分镜修改后，先做配置检查；这不代表图像已经合格
+python scripts/pixel_spec.py check out/pixel_spec.json
+```
+
+硬约束：3/4 俯视而非横版或等距菱形；16×16 地图格、16×32 农夫型素材框、
+脚点定位、独立前景遮挡；行走至少 3 个真实轮廓；工具动作有准备/接触/恢复和目标反馈；
+世界层整数倍最近邻放大。高清图缩小、像素化滤镜和 zoompan 不能代替这些资产与动作。
 
 ## 第 3 步：先把歌词的字搞对
 
@@ -216,9 +235,11 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 ```
 
 让用户确认参考图、角色设计、分镜、字幕位置和成本；不要只让用户确认一个风格名称。
+像素项目还必须确认 `pixel_spec.json` 中的投影、网格、角色比例与动作合同。
 
 **Gate B：试制。** 先做 2-3 个代表镜头（特写 / 中景 / 空景）并拼 10-15 秒样片，
 确认画风、主体尺度、字幕位置、图生视频稳定性和 `REVEAL`，再批量做全曲。
+`stardew` 试制至少包含一个完整步态和一个工具接触动作；只展示静态场景不算通过。
 这两道门把"全片返工"降级为"两镜返工"。完整执行细则见
 [references/production-playbook.md](references/production-playbook.md)。
 
@@ -236,6 +257,12 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 - 出图工具的 `output_dir` 参数经常被忽略，产物会落到默认目录，别指望它
 
 出完统一裁到目标分辨率（`images/c16/`），避免时间线里再缩放。
+
+**像素项目改走资产管线，不执行“每镜一张高清图”的默认做法。**先准备原生 tile、
+方向性 sprite、前景遮挡与局部环境动画层；AI 只探索构图和姿态，入库前必须清理到
+原生网格并按脚点配准。`stardew` 使用 16×16 地图格、16×32 农夫型素材框和独立
+`pixel_spec.json`，详细规则与提示词见 [references/stardew-pixel.md](references/stardew-pixel.md)。
+
 每镜立即登记提示词与状态，便于只重做该镜：
 
 ```bash
@@ -259,8 +286,12 @@ python scripts/manifest.py update -m out/manifest.json --shot s01 \
   3D render, text, watermark, extra limbs, deformed hands, flicker, jitter, morphing`
 - 即使写了"不要推近"，模型仍会轻微推近。通常构图更紧凑，可接受——
   验收看"服装颜色和人物设计有没有变"，不是"构图是否逐像素一致"
-- 额度会用尽（HTTP 429 `code 14018`）。**兜底方案**：用静帧 + `zoompan` 缓推，
-  能撑住时间线，但那一镜没有真实运动——要在交付时主动说明
+- **像素动作优先显式 sprite 序列，其次关键姿态驱动，最后才是纯文本生成整段。**
+  标注走、跑、砍、锄、浇、钓的镜头，若主要运动只有 zoompan、整体漂移或上下浮动，
+  直接判失败并退回 sprite 合成，不用更多提示词掩盖
+- 额度会用尽（HTTP 429 `code 14018`）。普通镜头可用静帧 + `zoompan` 缓推兜底，
+  但那一镜没有真实运动，必须在 manifest 和交付时主动说明；**像素动作镜不接受这种兜底**，
+  应改用已验收的姿态帧或保持静态待机并重排动作
 
 完成后登记来源；`still` 会在 QA 与交付报告中单独列出：
 
@@ -366,6 +397,16 @@ python scripts/contact_sheet.py --video "成片.mp4" \
 python scripts/manifest.py report -m out/manifest.json
 ```
 
+像素项目追加以下检查；`check` 只验配置，两个 `audit` 才检查真实图像：
+
+```bash
+python scripts/pixel_spec.py check out/pixel_spec.json
+python scripts/pixel_spec.py audit-sprites images/farmer_walk.png \
+    --frame-width 16 --frame-height 32 --cycle 0,1,0,2 --min-distinct 3
+# 在光照、HUD、字幕和视频编码前检查无损世界素材层
+python scripts/pixel_spec.py audit-scale images/world_layer.png --scale 4
+```
+
 **机械项**（由 `qa_check.py` 判定；FAIL 必须处理）
 
 - [ ] 基片与目标时长差 < 0.1s；成片与音频时长差 < 0.1s
@@ -383,6 +424,9 @@ python scripts/manifest.py report -m out/manifest.json
 - [ ] 片头歌名、歌手名完整出现且停留 ≥ 3s，不被淡出吃掉
 - [ ] 片尾署名整块出现，不被画面淡出切掉
 - [ ] 抽帧看四角没有残留水印
+- [ ] `stardew` 没有横版化、等距菱形化或高清图马赛克化；脚点、遮挡和连续通路正确
+- [ ] 行走有真实左右腿交替；工具有接触动作与目标反馈；待机不漂浮、背景不整体扭动
+- [ ] 季节/时间/天气与植被、作物、装饰一致；夜景灯具和窗户有局部光照响应
 
 ## 排错
 
