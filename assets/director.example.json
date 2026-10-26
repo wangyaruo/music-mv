@@ -1,0 +1,189 @@
+{
+  "title": "雨停之后（导演结构示例）",
+  "logline": "从封闭的房间走向可以安放过去的内心空间，以光线和影子的变化表现恢复。",
+  "semantic_thesis": "无法说出的过去不必被删除，也可以被重新安放。",
+  "themes": ["记忆", "自我修复"],
+  "emotional_arc": [
+    {
+      "stage": "封闭",
+      "emotion": "压抑",
+      "visual_strategy": "冷灰房间、狭窄构图和被拉长的影子",
+      "music_evidence": "前两行低密度节奏与长音"
+    },
+    {
+      "stage": "松动",
+      "emotion": "回望",
+      "visual_strategy": "雨痕失去锐利边缘，光斑开始进入房间",
+      "music_evidence": "第三行节奏流动与音色变暖"
+    },
+    {
+      "stage": "安放",
+      "emotion": "温和释放",
+      "visual_strategy": "影子缩短，空间打开，光停在可触及的位置",
+      "music_evidence": "尾句上行与尾奏留白"
+    }
+  ],
+  "rhythm_arc": [
+    {
+      "section": "起始",
+      "energy": "low",
+      "shot_density": "长镜头与少量微动作",
+      "motion": "雨痕和呼吸般的光线",
+      "transition_rule": "以形状和方向匹配，不用频繁硬切"
+    },
+    {
+      "section": "转折",
+      "energy": "rising",
+      "shot_density": "动作切点逐渐增加",
+      "motion": "光斑移动与影子后退",
+      "transition_rule": "以运动接续和局部遮挡连接"
+    },
+    {
+      "section": "尾奏",
+      "energy": "release",
+      "shot_density": "重新延长停留",
+      "motion": "光线稳定、空间保持开放",
+      "transition_rule": "以同构构图收束，不增加新物件"
+    }
+  ],
+  "visual_world": {
+    "setting": "同一间旧房、雨痕玻璃、短走廊与清晨窗台",
+    "palette": "冷青灰逐步过渡到暖米白",
+    "texture": "克制的纸张颗粒与柔和平面色块",
+    "style_anchor": "同一房间结构、同一光源方向、同一材质和影子逻辑"
+  },
+  "character_roles": [],
+  "absence_strategy": "以房间、影子和光斑作为主体，不强行加入人物、情侣或手部特写。",
+  "scenes": [
+    {
+      "id": "room_closed",
+      "purpose": "建立封闭的心理空间",
+      "emotion": "压抑",
+      "visual_elements": ["冷灰墙面", "被遮住的窗", "延伸到门口的细长影子"],
+      "action": "雨势减弱，房间保持静止",
+      "change": "雨停后影子仍没有缩短，表现过去尚未离开",
+      "lyric_ids": [1]
+    },
+    {
+      "id": "glass_memory",
+      "purpose": "把无形记忆转成可见的空间痕迹",
+      "emotion": "回望",
+      "visual_elements": ["雨痕玻璃", "重复窗框", "被拉长的窗影"],
+      "action": "焦点从雨痕转向室内，玻璃反光缓慢移动",
+      "change": "清晰雨痕变为柔光，封闭感开始松动",
+      "lyric_ids": [2]
+    },
+    {
+      "id": "corridor_light",
+      "purpose": "让过去以可整理的形式出现，而不是新增纪念品",
+      "emotion": "整理",
+      "visual_elements": ["短走廊", "地面光斑", "后退的影子"],
+      "action": "风推动窗帘，光斑从窗边移到房间中央",
+      "change": "零散乱影逐步排列成有方向的光带",
+      "lyric_ids": [3]
+    },
+    {
+      "id": "windowsill_morning",
+      "purpose": "以同一空间的开放状态完成情绪收束",
+      "emotion": "温和释放",
+      "visual_elements": ["清晨窗台", "暖米白墙面", "变短的影子"],
+      "action": "光停在窗台，窗帘逐渐稳定",
+      "change": "房间不再被过去占满，保留可继续生活的空地",
+      "lyric_ids": [4]
+    }
+  ],
+  "motifs": [
+    {
+      "id": "light",
+      "kind": "light",
+      "meaning": "可以重新进入生活的外部世界",
+      "function": "anchor",
+      "states": ["被雨遮蔽", "穿过玻璃", "停在窗台"],
+      "recurrence": 3
+    },
+    {
+      "id": "shadow",
+      "kind": "space",
+      "meaning": "被拉长但最终可以安放的旧事",
+      "function": "contrast",
+      "states": ["细长并封住出口", "分裂并后退", "缩短并融入房间"],
+      "recurrence": 2
+    }
+  ],
+  "non_object_strategy": "",
+  "transitions": [
+    {
+      "from": "room_closed",
+      "to": "glass_memory",
+      "trigger": "第一句结束时的雨停与第二句的“影子”",
+      "technique": "以窗框影子的相同方向匹配到玻璃近景",
+      "continuity": "visual"
+    },
+    {
+      "from": "glass_memory",
+      "to": "corridor_light",
+      "trigger": "第三句“风”带来的运动",
+      "technique": "让玻璃反光接续为走廊地面光斑",
+      "continuity": "semantic"
+    },
+    {
+      "from": "corridor_light",
+      "to": "windowsill_morning",
+      "trigger": "尾句动作与尾奏留白",
+      "technique": "沿光带方向切到同构窗台，影子保持连续",
+      "continuity": "spatial"
+    }
+  ],
+  "coherence_rules": [
+    "四个场景共享同一房间结构，不新增无关地点。",
+    "色板只能从冷青灰向暖米白单向变化，不随机换色。",
+    "影子长度、光源方向和空间开放程度必须遵循同一逻辑。"
+  ],
+  "alternatives_considered": [
+    {
+      "title": "雨中的无人车站",
+      "premise": "以无人车站表现等待与离开",
+      "visual_strategy": "固定人物背影、车辆进出和站台光线"
+    },
+    {
+      "title": "房间里的时间",
+      "premise": "以同一房间的光影变化表现内心恢复",
+      "visual_strategy": "无人物，以空间和材料承担主体"
+    }
+  ],
+  "selected_concept": "房间里的时间",
+  "coverage": [
+    {
+      "lyric_id": 1,
+      "lyric_text": "雨停在没说出口的午后",
+      "visual_intent": "雨停并未带来释放，先展示仍未解开的房间状态",
+      "change": "雨停后细长影子仍封住出口",
+      "scene_id": "room_closed",
+      "motif_ids": ["shadow"]
+    },
+    {
+      "lyric_id": 2,
+      "lyric_text": "影子把房间拉得很长",
+      "visual_intent": "用窗影和焦距变化表现记忆对空间的占据",
+      "change": "清晰雨痕转为柔光，影子开始后退",
+      "scene_id": "glass_memory",
+      "motif_ids": ["light", "shadow"]
+    },
+    {
+      "lyric_id": 3,
+      "lyric_text": "风把旧事吹成一地光",
+      "visual_intent": "把抽象旧事转为可整理的光斑，而不是引入新的纪念物",
+      "change": "散影逐渐形成有方向的光带",
+      "scene_id": "corridor_light",
+      "motif_ids": ["light", "shadow"]
+    },
+    {
+      "lyric_id": 4,
+      "lyric_text": "我把明天慢慢擦亮",
+      "visual_intent": "以同一空间的开放和稳定光线完成主动修复",
+      "change": "影子缩短，光停在窗台，房间留出空地",
+      "scene_id": "windowsill_morning",
+      "motif_ids": ["light", "shadow"]
+    }
+  ]
+}

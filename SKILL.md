@@ -9,14 +9,14 @@ agent_created: true
 把一首歌变成一支成片级别的动画 MV。核心链路：
 
 ```
-听歌定拍 → 定风格 → 校歌词 → 定分镜 → 草稿/试制确认 → 出图 → 图生视频 → 卡拍剪时间线 → 逐字弹字幕 → 混音出片 → 自动 QA
+听歌定拍 → 校歌词 → 导演构思与风格锁定 → 定分镜 → 草稿/试制确认 → 出图 → 图生视频 → 卡拍剪时间线 → 逐字弹字幕 → 混音出片 → 自动 QA
 ```
 
 本 skill 提供这条链路上的全部可执行脚本，以及一份"哪些地方必须人工判断"的清单。
 
-## 四条核心原则
+## 五条核心原则
 
-整条流水线的设计都围绕这四条。理解了它们，每一步的"为什么"就都能推出来。
+整条流水线的设计都围绕这五条。理解了它们，每一步的"为什么"就都能推出来。
 
 **一、时间是骨架，所有东西都吸附到同一个网格上。**
 拍点网格是音乐的时间坐标。切点、歌词起止、每个字的出字时刻，全部吸到
@@ -27,13 +27,18 @@ agent_created: true
 不要把镜头时长当作约束去挪切点，也不要让一个镜头跨两句。
 一旦开始"为了压到 6 秒而微调"，误差就会累积成"字幕换了画面还没切"。
 
-**三、风格必须在出第一张图之前锁死。**
+**三、导演构思先于物件与分镜。**
+先理解歌词语义、情绪和节奏，再由 AI 提出视觉概念、角色、场景、物件、动作和衔接。
+不要从预设物件或地点清单反推剧情；抽象歌词也要形成有递进的视觉结构。详见
+[references/director-storytelling.md](references/director-storytelling.md)。
+
+**四、风格必须在出第一张图之前锁死。**
 返工成本 = 全片成本。风格由三样东西锁定：角色设计图（人物锚）、
 提示词里的文字复述（可辨识特征）、以及"主体不能太小"这条硬约束
 （主体一小，模型就会退化成写实风景）。详见
 [references/visual-style.md](references/visual-style.md)。
 
-**四、每一步都要能机械验收。**
+**五、每一步都要能机械验收。**
 切点偏差、复唱偏移、响度、时长差——这些都应该是脚本打印出来的数字，
 不是"看着差不多"。凡是只能靠眼睛判断的，就写一条命令把它变成数字。
 
@@ -62,7 +67,9 @@ project/
 │   ├── beats.json            # 拍点表
 │   ├── groups.json           # 歌词分组（人工）
 │   ├── lines_timing.json     # 逐句时间轴
-│   ├── shots.tsv             # 分镜表（人工）
+│   ├── director.json         # AI 导演构思：语义/情绪/节奏/场景/母题/转场/逐句覆盖
+│   ├── director.md           # 给用户确认的导演视觉总纲
+│   ├── shots.tsv             # 分镜表（从导演总纲展开）
 │   ├── storyboard.md         # 导演草稿（生成前确认门）
 │   ├── manifest.json         # 逐镜提示词、来源、成本与状态
 │   ├── pixel_spec.json       # 像素项目专用：投影、网格、动作合同与状态层
@@ -84,10 +91,13 @@ project/
 开工前必须问清三件事，缺一个就停下来问：
 
 1. **画幅** 16:9 / 9:16 / 1:1 —— 决定所有出图与出视频的比例，中途改等于重做
-2. **风格** 用 `style_advisor.py` 给 3 个候选让用户选，**不要自己拍板**；像素风还必须区分街机横版、星露谷式 3/4 俯视等子类型
+2. **风格偏好** 用 `style_advisor.py` 给 3 个候选让用户选，**不要自己拍板**；此时只是候选，最终风格在导演视觉总纲确认后锁定
 3. **规模** 全曲逐句，还是只做副歌？全曲逐句通常 30-45 镜，成本要提前说清
 
-风格一旦定了就不能中途换——换风格意味着 41 张图 + 41 段视频全部重做。
+**不要要求用户预选具象物件、界面装置或“纯氛围”。**先由 AI 在导演阶段理解歌词并提出
+视觉概念，再决定是否需要人物、实物、UI 或非具象表达。
+
+导演总纲确认后风格不能中途换——换风格意味着 41 张图 + 41 段视频全部重做。
 本 skill 的血泪教训：黏土风做完被一句"这种不好看"整片返工。
 
 ## 第 1 步：听歌定拍
@@ -114,8 +124,8 @@ python scripts/song_structure.py --audio song.mp3 -o out/structure.json
 python scripts/style_advisor.py --audio song.mp3 --lyrics lyrics.txt --title "歌名"
 ```
 
-给 3 套候选 + 打分 + 理由 + 建议单镜时长与叠化时长。拿给用户选，选定后记下
-`shot` 与 `fade` 两个参数，后面直接套用。
+给 3 套候选 + 打分 + 理由 + 建议单镜时长与叠化时长。先作为导演构思的候选，
+不要只凭风格名称直接批量出图；最终 `shot`、`fade` 和风格锚点随导演总纲一起确认。
 
 ### 像素风先锁子类型与动作合同
 
@@ -188,8 +198,38 @@ python scripts/check_repeat.py --timing out/lines_timing.json \
 更硬的校验方法见 [references/lyrics-accuracy.md](references/lyrics-accuracy.md) 的
 "用 OCR 读原片歌词"一节。
 
+## 第 3.5 步：AI 导演构思与视觉总纲
+
+不要先列物件、地点或“每句配什么图”。先读 [references/director-storytelling.md](references/director-storytelling.md)，
+综合校订歌词、`beats.json`、`structure.json`、风格候选和用户约束，完成两轮创作：
+
+**第一轮：提出 2–3 套真正不同的视觉概念。**每套写清 logline、情绪弧线、视觉世界、
+主体选择、关键场景、贯穿母题、节奏与转场规则，以及整首歌词的覆盖方式。差异必须来自
+叙事视角和视觉机制，不是同一方案换色板。AI 主动设计角色、场景、物件和动作；
+不强制用户先选物件，也不强制出现人物或爱情剧情。
+
+**第二轮：按用户选定的概念展开 `director.json`。**必须包含：
+- 主题与潜台词、至少 3 阶段情绪弧线、节奏弧线及音乐证据
+- 视觉世界、角色功能或 `absence_strategy`、场景动作与可见变化
+- 0–4 个核心母题及状态轨迹；没有实物时填写 `non_object_strategy`
+- 转场的语义/情绪/节奏/视觉/空间连续性，以及角色、空间和风格连贯规则
+- 每句歌词的 `visual_intent`、`change`、`scene_id` 与可选 `motif_ids`
+
+```bash
+# 脚本只生成空白结构；创意内容必须由 AI 根据歌曲完成，不能照抄示例
+python scripts/director_plan.py scaffold --lyrics lyrics.txt --title "歌名" -o out/director.json
+python scripts/director_plan.py check out/director.json --lyrics lyrics.txt
+python scripts/director_plan.py review out/director.json --lyrics lyrics.txt -o out/director.md
+```
+
+先让用户确认 `director.md`，再展开 `shots.tsv`。`check` 只验证结构和覆盖，不替代
+语义与审美评审；抽象歌词可改用心理空间、自然材料、身体局部或视觉规则，不能拼随机空镜。
+需要量化 UI 时再选 `references/ui-narrative.md` 中的装置，不把界面装置当默认答案。
+
 ## 第 4 步：定分镜
 
+从已确认的 `director.json` 展开 `out/shots.tsv`：每句先保留视觉意图和可见变化，
+再确定场景、角色/物件动作、构图和转场，不得退化为逐句换地点或逐句换物件。
 写 `out/shots.tsv`，制表符分隔，UTF-8，列固定：
 
 ```
@@ -241,7 +281,8 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
     --style cel --width 1920 --height 1080 -o out/manifest.json
 ```
 
-让用户确认参考图、角色设计、分镜、字幕位置和成本；不要只让用户确认一个风格名称。
+先让用户确认 `director.md` 中的主题理解、情绪弧线、视觉世界和逐句覆盖，再确认参考图、
+角色设计、分镜、字幕位置和成本；不要只让用户确认一个风格名称或一个具象物件。
 像素项目还必须确认 `pixel_spec.json` 中的投影、网格、角色比例与动作合同。
 
 **Gate B：试制。** 先做 2-3 个代表镜头（特写 / 中景 / 空景）并拼 10-15 秒样片，
@@ -254,6 +295,7 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 
 ## 第 5 步：出图
 
+按 `director.json` 决定每镜的场景、角色、物件及动作，不调用预设物件清单。
 每镜一张。画风怎么锁死、主体太小为什么一定会跑偏，见
 [references/visual-style.md](references/visual-style.md)。核心四条：
 
@@ -400,6 +442,7 @@ python scripts/make_cover.py --image images/c16/s12.png \
 先跑自动验收与视觉联系表：
 
 ```bash
+python scripts/director_plan.py check out/director.json --lyrics lyrics.txt
 python scripts/qa_check.py --project . --audio song.mp3 --final "成片.mp4"
 python scripts/contact_sheet.py --images 'images/c16/s*.png' \
     --out out/qa/style_sheet.png --cols 7
@@ -443,6 +486,8 @@ python scripts/pixel_spec.py audit-sprites images/hero_walk.png \
 - [ ] 季节/时间/天气与植被、作物、装饰一致；夜景灯具和窗户有局部光照响应
 - [ ] `pixelstory` 的 2–4 个状态通道与人物行为一致，复唱有状态推进，不是只换背景
 - [ ] 多人镜头能读出距离/遮挡；关键道具插页有结果；开场与结算共享同一套叙事规则
+- [ ] 全片能回扣导演阐述和情绪弧线；每句有可见变化，没有机械堆砌物件或随机空镜
+- [ ] 转场有语义/情绪/节奏/视觉/空间连续性；角色、物件、色板和空间逻辑前后一致
 
 ## 排错
 

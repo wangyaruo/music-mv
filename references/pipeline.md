@@ -18,7 +18,10 @@ lyrics.txt（人工核对）
    ├─ groups.json（人工切组）
    │      └─ lyrics_timing.py ─► lines_timing.json  逐句起止
    │
-shots.tsv（人工写分镜）
+   ├─ director_plan.py ────────► director.json        AI 导演构思 + 逐句视觉覆盖
+   │      └─ review ───────────► director.md          用户确认的视觉总纲
+   │
+shots.tsv（从 director.json 展开）
    │
    ├─ build_lines.py ─────────► lines.json          加字幕位置 + 片头尾卡
    │      └─ make_subs.py ────► subs.ass
@@ -30,8 +33,16 @@ clips/v01..vNN.mp4
    └─ mix_final.py ───────────► 成片.mp4            字幕 + 调色 + 响度
 ```
 
-三条"人工"环节不能自动化：**风格选择**、**歌词校订**、**分镜表**。
-这三件事决定了片子好不好看，剩下的都是工程。
+需要保留人工判断的环节包括：**歌词校订**、**导演概念选择**、**分镜与风格审美确认**。
+AI 负责语义分析、提出多套视觉概念并展开创意，不从预设物件或模板自动生成答案。
+
+## director.json / director.md
+
+`director.json` 是 AI 导演视觉总纲的结构化记录，包含主题、情绪与节奏弧线、视觉世界、
+角色或主体策略、场景动作、母题状态、转场、连贯规则和逐句覆盖。`scaffold` 只创建空白结构，
+创意必须由 AI 根据歌曲完成。`check` 只检查结构与歌词覆盖，`review` 生成用户确认的
+`director.md`；通过结构检查不等于语义和审美合格。详见
+[director-storytelling.md](director-storytelling.md)。
 
 ## beats.json
 

@@ -2,7 +2,7 @@
 
 把一首歌做成卡拍点、逐字弹字幕、字幕跟镜头联动的动画 MV。
 
-一套可执行的流水线：**听歌定拍 → 定风格 → 校歌词 → 定分镜 → 草稿/试制确认 →
+一套可执行的流水线：**听歌定拍 → 校歌词 → 导演构思与风格锁定 → 定分镜 → 草稿/试制确认 →
 出图 → 图生视频 → 卡拍剪时间线 → 逐字弹字幕 → 混音出片 → 自动 QA**。
 
 产出 16:9 / 9:16 / 1:1 的 MP4 + 封面。字幕**逐镜排布**——人物在哪一侧、
@@ -22,9 +22,11 @@
 3. **字幕和画面打架**。固定一行字幕，遇到特写就压脸，遇到广角又显得悬空。
 4. **全片做完才发现方向错了**。没有草稿与试制确认，返工成本等于全片成本。
 5. **无法机械验收与复盘**。素材时长、切点、复唱偏移、静帧兜底和成本靠记忆管理。
+6. **歌词与画面各说各话**。从预设物件或地点出发，导致机械配图、抽象歌词拼空镜、全片没有情绪递进。
 
-对应方案：每字吸附到拍点网格；歌词走"多源核对 + 段落锚点"；字幕位置由分镜表
-`place` 决定；导演草稿与试制两道确认门；manifest + QA + 联系表记录并验证整片。
+对应方案：每字吸附到拍点网格；歌词走"多源核对 + 段落锚点"；AI 先提出并比较
+视觉概念，形成 `director.json` 和逐句覆盖，再展开分镜；字幕位置由分镜表 `place` 决定；
+导演草稿与试制两道确认门；manifest + QA + 联系表记录并验证整片。
 
 ## 安装
 
@@ -80,29 +82,36 @@ python scripts/lyrics_timing.py --groups out/groups.json --beats out/beats.json 
 python scripts/check_repeat.py --timing out/lines_timing.json \
     --first 1-18 --second 19-36
 
-# 4. 人工写 out/shots.tsv，然后生成导演草稿与逐镜生产清单
+# 4. AI 导演构思：先比较视觉概念，再完成逐句覆盖，不要求用户预选物件
+python scripts/director_plan.py scaffold --lyrics lyrics.txt --title "歌名" -o out/director.json
+# 由 AI 根据歌曲填写 director.json 后：
+python scripts/director_plan.py check out/director.json --lyrics lyrics.txt
+python scripts/director_plan.py review out/director.json --lyrics lyrics.txt -o out/director.md
+
+# 5. 从导演总纲展开 out/shots.tsv，然后生成导演草稿与逐镜生产清单
 python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
     --style cel --width 1920 --height 1080 -o out/manifest.json
 # 先确认 out/storyboard.md，再试制 2-3 镜，最后批量生成 clips/v01.mp4 ...
 
-# 5. 字幕条目与逐字 ASS
+# 6. 字幕条目与逐字 ASS
 python scripts/build_lines.py --timing out/lines_timing.json --shots out/shots.tsv \
     --cards out/cards.json -o out/lines.json
 python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
     --motifs --width 1920 --height 1080 -o out/subs.ass
 
-# 6. 卡拍拼接：自动读音频时长、探测素材、补帧裁齐、写入验收报告
+# 7. 卡拍拼接：自动读音频时长、探测素材、补帧裁齐、写入验收报告
 python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
     --beats out/beats.json --audio song.mp3 --fade 0.45 \
     --width 1920 --height 1080 --fill-ids s02,s10,s04,s27 -o out/base.mp4
 
-# 7. 合成与封面（delogo 默认关闭，确认水印坐标后再显式开启）
+# 8. 合成与封面（delogo 默认关闭，确认水印坐标后再显式开启）
 python scripts/mix_final.py --base out/base.mp4 --audio song.mp3 \
     --subs out/subs.ass --out "成片.mp4"
 python scripts/make_cover.py --image images/c16/s12.png \
     --title "歌名" --artist "歌手" --out out/cover.png
 
-# 8. 自动 QA + 视觉联系表 + 成本/兜底清单
+# 9. 自动 QA + 视觉联系表 + 成本/兜底清单
+python scripts/director_plan.py check out/director.json --lyrics lyrics.txt
 python scripts/qa_check.py --project . --audio song.mp3 --final "成片.mp4"
 python scripts/contact_sheet.py --images 'images/c16/s*.png' \
     --out out/qa/style_sheet.png --cols 7
@@ -147,6 +156,7 @@ python scripts/manifest.py report -m out/manifest.json
 | `beat_sync.py` | BPM 与拍点网格（频谱通量 + 自相关 + 相位搜索） |
 | `song_structure.py` | 段落边界与分镜数量参考（**只作参考**，长副歌会误判） |
 | `style_advisor.py` | 按 tempo / 能量 / 亮度 / 歌词意象推荐 3 套画风 |
+| `director_plan.py` | 导演结构脚手架、情绪/节奏/母题/转场与逐句覆盖校验、用户审阅稿 |
 | `pixel_spec.py` | 星露谷/横版像素剧情规格、真实 sprite 轮廓与整数缩放校验 |
 | `lyrics_timing.py` | 歌词分组 → 逐句时间轴（锚点 + 字数比例 + 拍点吸附） |
 | `asr_segments.py` | 可选 faster-whisper 分段，只取边界、不采用识别文本 |
@@ -165,6 +175,7 @@ python scripts/manifest.py report -m out/manifest.json
 ## 文档
 
 - [SKILL.md](SKILL.md) —— 完整工作流与每个环节的判断依据
+- [references/director-storytelling.md](references/director-storytelling.md) —— AI 导演构思、抽象歌词表达、视觉母题、镜头衔接与逐句覆盖
 - [references/production-playbook.md](references/production-playbook.md) —— 两道确认门、manifest、QA、多画幅与交付纪律
 - [references/pipeline.md](references/pipeline.md) —— 数据结构、时间线数学、成本模型、真实案例复盘
 - [references/visual-style.md](references/visual-style.md) —— 画风锁定：从设计稿到 40 镜不跑偏
@@ -199,6 +210,7 @@ GitHub Actions 会执行编译检查、单元测试和完整 demo。
 - 图生视频单段上限约 6 秒；默认慢放超过 1.3 倍会中止，需拆镜或更换素材。
 - `stardew` 不能只靠提示词或像素化滤镜实现；AI 构图和姿态候选仍需在原生网格中清理、配准并通过 sprite/缩放审计。
 - `pixelstory` 不能只靠 HUD 和街景复用；每镜必须有可见状态变化，关键手势和道具结果还需真实姿态与构图证据。
+- `director_plan.py check` 只检查导演结构和歌词覆盖，不能证明语义理解、审美或最终画面质量；必须保留导演评审与试制确认。
 - 逐字字幕需要 `libass` 支持内联标签，极老的 ffmpeg 可能有问题。
 - 示例 `shots.example.tsv` 保留了早期黏土版案例，仅用于数据结构对照；
   新项目的提示词必须遵循 `visual-style.md` 的三段式，不要照抄旧画风。
