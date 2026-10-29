@@ -37,6 +37,8 @@ agent_created: true
 提示词里的文字复述（可辨识特征）、以及"主体不能太小"这条硬约束
 （主体一小，模型就会退化成写实风景）。详见
 [references/visual-style.md](references/visual-style.md)。
+走代码渲染路线时"锁死"的对象不同——锁的是调色板、逻辑画布尺寸和 sprite 网格，
+改一个数字重渲只要几秒；返工成本几乎为零，但一致性风险换了个地方（见原则五）。
 
 **五、每一步都要能机械验收。**
 切点偏差、复唱偏移、响度、时长差——这些都应该是脚本打印出来的数字，
@@ -48,11 +50,18 @@ agent_created: true
 
 **不适用**：纯剪辑已有视频素材（那不需要出图）、纯字幕翻译、纯音频处理。
 
+**另一种走法：不出图。** 如果整片能落成「像素场景 + UI 界面 + 文字卡」这类
+几何可描述的画面，改走 [references/procedural-pixel.md](references/procedural-pixel.md)
+的代码渲染路线——每一帧由 Python 画出来，零出图、零图生视频，成本为零，
+代价是一次性的编码时间。先按那份文档第一节的分工表确认适配，再决定要不要开工；
+不适配就回到默认的 AI 出图路线，不要硬套。
+
 ## 硬性前提
 
 - `ffmpeg`（带 `ass` / `xfade` / `zoompan` / `loudnorm` / `delogo` 滤镜）
 - Python 3.9+，`numpy`
-- 出图 / 图生视频能力（本 skill 调用 ImageGen / VideoGen）
+- 出图 / 图生视频能力（本 skill 调用 ImageGen / VideoGen）。
+  走[纯代码渲染路线](references/procedural-pixel.md)时这两样都不需要，只要 Pillow
 - 字体：`assets/fonts/ZCOOLKuaiLe-Regular.ttf`（随仓库附带，SIL OFL）
 
 `ffprobe` 不要求，脚本用 `ffmpeg -i` 的 stderr 读时长。
@@ -151,6 +160,20 @@ python scripts/pixel_spec.py check out/pixel_spec.json
 `state_change`，再写画面：选择 2–4 个状态通道，保留一个关键道具及其结果状态，
 用开场与结算形成闭环。多人镜头必须明确距离/遮挡；关键手势和道具动作必须有真实姿态，
 不能只给静态街景挂爱心和 SCORE。
+
+### 第三种像素走法：procedural（不出图，用代码画）
+
+上面两种都是「AI 出图 → 图生视频」。若画面**能用矩形和线描述出来**——像素场景、
+UI 界面、文字卡、地图、HUD、数值——就不要出图，用 Python 直接画每一帧。
+全片零张 AI 图、零次图生视频，成本为零，可以为了一个字晚 80ms 重渲十次，
+且每一帧都能被脚本逐帧检查。
+
+代价是开发时间：第一支最贵，第二支起几乎免费。只做一支片，AI 路线更快。
+判断标准、四层结构、五个必踩的坑见
+[references/procedural-pixel.md](references/procedural-pixel.md)；
+可跑骨架在 `assets/procedural_skeleton/skeleton.py`（`python3 skeleton.py` 直接出三张图）。
+
+选这条路时**跳过第 5、6 步**，第 7 步退化为「核对 scenes 首尾相接 + ffmpeg 封装」。
 
 ## 第 3 步：先把歌词的字搞对
 
@@ -316,6 +339,11 @@ python scripts/manifest.py init --shots out/shots.tsv --audio song.mp3 \
 `pixelstory` 还需先完成场景复用矩阵、2–4 个状态通道、多人距离构图和关键道具插页，
 见 [references/pixel-narrative.md](references/pixel-narrative.md)。
 
+**`procedural` 项目在这一步不出图。** 改做三件事：写 `art.py` 的 sprite 原语
+（字符网格 + 参数化矩形）、把场景拼成一条 `world` 长卷、写 `storyboard.json`
+让渲染器按 `kind` 分发。产出是代码而不是图片，样张用渲染器的 `--still <t>` 单帧导出。
+规则与坑见 [references/procedural-pixel.md](references/procedural-pixel.md)。
+
 每镜立即登记提示词与状态，便于只重做该镜：
 
 ```bash
@@ -325,7 +353,10 @@ python scripts/manifest.py update -m out/manifest.json --shot s01 \
 
 ## 第 6 步：图生视频
 
-每镜一段。要点：
+**`procedural` 项目跳过这一步**——运动是周期函数（呼吸、眨眼、波纹、镜头横移），
+不是生成出来的。要让某个动作更有生命力，改函数参数，不要改提示词。
+
+每镜一段（AI 路线）。要点：
 
 - 提示词只描述**运动**（"the cake splits, jam stretches"），外观由输入图决定，
   不要把风格词重复堆进去
@@ -355,6 +386,11 @@ python scripts/manifest.py update -m out/manifest.json --shot s01 \
 ```
 
 ## 第 7 步：卡拍剪时间线
+
+**`procedural` 项目没有「一镜一段 clip」。** 渲染器按 `storyboard.json` 的
+`start/end` 直接逐帧出图，切点由数据决定，不存在拼接误差、时长漂移和尾奏填充。
+这一整步退化成两件事：确认 `scenes` 首尾相接、没有空隙与重叠；
+用 ffmpeg 把帧序列和音轨封成 mp4。下面这套（AI 路线）用不上。
 
 ```bash
 python scripts/build_base.py --shots out/shots.tsv --clips-dir clips \
@@ -463,6 +499,15 @@ python scripts/pixel_spec.py audit-scale images/world_layer.png --scale 4
 python scripts/pixel_spec.py audit-sprites images/hero_walk.png \
     --frame-width 24 --frame-height 32 --cycle 0,1,0,1 --min-distinct 2
 ```
+
+`procedural` 项目追加以下四项；前三项只有代码渲染做得到，AI 路线跳过：
+
+- [ ] **音画同步**：成片音轨与源音频的 8kHz 包络做互相关，`lag == 0` 且归一化相关 > 0.99
+      （lag 不为 0 是 ffmpeg 有 offset；相关 < 0.95 说明混音改过动态）
+- [ ] **帧格对齐**：所有抽帧时间点落在 `n / fps` 上。
+      `19.25 × 30 = 577.5` 会抽到 577 号帧，造出 17ms 的假差异，然后你去修一个不存在的问题
+- [ ] **半透明**：全部走独立图层 + `alpha_composite`，没有一整块死色
+- [ ] **视差归属**：镜头横移时，人物与长椅/门/桌子的相对位置不变
 
 **机械项**（由 `qa_check.py` 判定；FAIL 必须处理）
 

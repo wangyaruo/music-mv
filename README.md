@@ -181,6 +181,8 @@ python scripts/manifest.py report -m out/manifest.json
 - [references/visual-style.md](references/visual-style.md) —— 画风锁定：从设计稿到 40 镜不跑偏
 - [references/stardew-pixel.md](references/stardew-pixel.md) —— 星露谷式投影、tile/sprite、动作、遮挡、光照与图像级验收
 - [references/pixel-narrative.md](references/pixel-narrative.md) —— 横版像素剧情、状态通道、场景复用、距离构图与道具/结算闭环
+- [references/ui-narrative.md](references/ui-narrative.md) —— 游戏/软件界面装置叙事：用量化机制承载抽象歌词
+- [references/procedural-pixel.md](references/procedural-pixel.md) —— 纯代码像素渲染：不出图、零成本，四层结构、五个必踩的坑与可跑骨架
 - [references/lyrics-accuracy.md](references/lyrics-accuracy.md) —— 歌词校对，以及用 OCR 读原片歌词做时间轴校准
 - [references/subtitle-styling.md](references/subtitle-styling.md) —— ASS 版式、逐字节奏（`REVEAL`）、踩坑
 - [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md) —— 滤镜配方
