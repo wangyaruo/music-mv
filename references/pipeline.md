@@ -18,6 +18,8 @@ lyrics.txt（人工核对）
    ├─ groups.json（人工切组）
    │      └─ lyrics_timing.py ─► lines_timing.json  逐句起止
    │
+devices.tsv（人工，仅界面装置路线）
+   │
    ├─ director_plan.py ────────► director.json        AI 导演构思 + 逐句视觉覆盖
    │      └─ review ───────────► director.md          用户确认的视觉总纲
    │
@@ -43,6 +45,9 @@ AI 负责语义分析、提出多套视觉概念并展开创意，不从预设�
 创意必须由 AI 根据歌曲完成。`check` 只检查结构与歌词覆盖，`review` 生成用户确认的
 `director.md`；通过结构检查不等于语义和审美合格。详见
 [director-storytelling.md](director-storytelling.md)。
+
+需要量化 UI 时，在导演总纲内补充 `devices.tsv` 的数值与状态规则；
+它不再是默认路径。见 [ui-narrative.md](ui-narrative.md)。
 
 ## beats.json
 
@@ -94,6 +99,9 @@ AI 负责语义分析、提出多套视觉概念并展开创意，不从预设�
 | `motion` | 运动描述，直接用作图生视频提示词主体 |
 
 **单镜时长上限**由图生视频能力决定，通常是 6 秒。超过就拆镜。
+
+例外：纯界面装置镜头（静态场景 + 数值/文字动效，不经过图生视频）不受此限，
+可放到 8–12 秒。判据是"这一镜要靠画面内演化读完信息"，切碎了就读不完。
 
 **`place` 怎么填**：看画面构图，不看歌词内容。
 
@@ -153,6 +161,9 @@ xfade 起始 offset[i] = 累计时长 - D/2
 | **合计** | | | **≈ 3820 credits** |
 
 只做副歌（约 12 镜）约 1100 credits。开工前把这个量级告诉用户。
+
+界面装置路线不走图生视频，同样的时长额度消耗约为上表的 1/5–1/10，
+代价是前置的 UI 组件设计。取舍见 [ui-narrative.md](ui-narrative.md) 第四节。
 
 ## 案例：周杰伦《园游会》（4:15.58 / 16:9 / 41 镜）
 
